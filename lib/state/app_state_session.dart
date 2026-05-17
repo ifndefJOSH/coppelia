@@ -208,6 +208,9 @@ extension AppStateSessionExtension on AppState {
       await _loadFavoriteAlbums();
       await _loadFavoriteArtists();
       await _loadFavoriteTracks();
+      if (_smartLists.isNotEmpty) {
+        unawaited(_refreshSmartListSource());
+      }
       _refreshSelectedSmartList();
       if (isHomeSectionVisible(HomeSection.jumpIn)) {
         unawaited(loadJumpIn(force: true));
