@@ -79,8 +79,8 @@ class JellyfinClient {
       queryParameters: {
         'UserId': userId,
         'DeviceId': _deviceId,
-        'Container': 'mp3',
-        'AudioCodec': 'mp3',
+        'Container': 'mp3,flac,ogg,wav,aac,m4a,opus,webma',
+        'AudioCodec': 'mp3,flac,vorbis,aac,opus,wav',
         'TranscodingContainer': 'mp3',
         'TranscodingProtocol': 'http',
         'api_key': token,

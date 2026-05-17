@@ -20,7 +20,7 @@ Future<void> main() async {
   // Initialize logging service
   final logService = await LogService.instance;
   await logService.info('App starting - version ${AppInfo.displayVersion}');
-  if (Platform.isAndroid) {
+  if (Platform.isAndroid || Platform.isIOS) {
     await JustAudioBackground.init(
       androidNotificationChannelId: 'com.matelsky.coppelia.audio',
       androidNotificationChannelName: 'Coppelia Playback',
