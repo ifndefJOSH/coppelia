@@ -1680,7 +1680,6 @@ class AppState extends ChangeNotifier {
         .info('_playFromList[$requestId]: Priming now playing track state');
     _setNowPlaying(
       playbackTrack,
-      notify: false,
       forceRestart: true,
     );
     _rememberCurrentIndexEvent(index, playbackTrack);
@@ -1733,6 +1732,16 @@ class AppState extends ChangeNotifier {
       streamUrl: streamUrl,
       albumId: track.albumId,
       artistIds: track.artistIds,
+      playlistItemId: track.playlistItemId,
+      addedAt: track.addedAt,
+      playCount: track.playCount,
+      lastPlayedAt: track.lastPlayedAt,
+      genres: track.genres,
+      container: track.container,
+      codec: track.codec,
+      bitrate: track.bitrate,
+      sampleRate: track.sampleRate,
+      bpm: track.bpm,
     );
   }
 

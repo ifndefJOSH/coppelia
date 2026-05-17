@@ -1,7 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
-import 'package:just_audio/just_audio.dart'
-    show LoopMode, PlayerState, ProcessingState;
+import 'package:audio_service/audio_service.dart' as audio_service;
+import 'package:just_audio/just_audio.dart';
 import 'package:media_kit/media_kit.dart' as media_kit;
 
 import '../models/media_item.dart';
@@ -9,13 +10,407 @@ import 'cache_store.dart';
 import 'log_service.dart';
 
 /// Wraps audio playback with queue and state helpers.
+///
+/// Android/iOS stay on `just_audio` so native mobile playback, notifications,
+/// and platform media controls keep working. Desktop uses `media_kit` directly
+/// because the `just_audio_media_kit` shim does not reliably seek or report
+/// position for some formats.
 class PlaybackController {
-  PlaybackController({media_kit.Player? player})
+  PlaybackController({
+    AudioPlayer? audioPlayer,
+    media_kit.Player? mediaKitPlayer,
+    bool? useNativeJustAudio,
+  }) : _engine = (useNativeJustAudio ?? _useNativeJustAudioByDefault)
+            ? _JustAudioPlaybackEngine(player: audioPlayer)
+            : _MediaKitPlaybackEngine(player: mediaKitPlayer);
+
+  final _PlaybackEngine _engine;
+
+  static bool get _useNativeJustAudioByDefault =>
+      Platform.isAndroid || Platform.isIOS;
+
+  /// Stream of playback position updates.
+  Stream<Duration> get positionStream => _engine.positionStream;
+
+  /// Latest known playback position.
+  Duration get position => _engine.position;
+
+  /// Stream of playback duration updates.
+  Stream<Duration?> get durationStream => _engine.durationStream;
+
+  /// Latest known duration from the player, if available.
+  Duration? get duration => _engine.duration;
+
+  /// Stream of play/pause state updates.
+  Stream<PlayerState> get playerStateStream => _engine.playerStateStream;
+
+  /// Stream of the current queue index.
+  Stream<int?> get currentIndexStream => _engine.currentIndexStream;
+
+  /// True when playback is active.
+  bool get isPlaying => _engine.isPlaying;
+
+  /// Latest playback processing state.
+  ProcessingState get processingState => _engine.processingState;
+
+  /// The current media item from the queue.
+  MediaItem? get currentMediaItem => _engine.currentMediaItem;
+
+  /// Current queue index, if available.
+  int? get currentIndex => _engine.currentIndex;
+
+  /// Sets the playback queue.
+  Future<void> setQueue(
+    List<MediaItem> items, {
+    int startIndex = 0,
+    Duration? startPosition,
+    CacheStore? cacheStore,
+    Map<String, String>? headers,
+  }) {
+    return _engine.setQueue(
+      items,
+      startIndex: startIndex,
+      startPosition: startPosition,
+      cacheStore: cacheStore,
+      headers: headers,
+    );
+  }
+
+  /// Enables or disables gapless playback behavior.
+  Future<void> setGaplessPlayback(bool enabled) {
+    return _engine.setGaplessPlayback(enabled);
+  }
+
+  /// Appends a track to the current queue.
+  Future<void> appendToQueue(
+    MediaItem item, {
+    CacheStore? cacheStore,
+    Map<String, String>? headers,
+  }) {
+    return _engine.appendToQueue(
+      item,
+      cacheStore: cacheStore,
+      headers: headers,
+    );
+  }
+
+  /// Inserts a track after the current item.
+  Future<void> insertNext(
+    MediaItem item, {
+    CacheStore? cacheStore,
+    Map<String, String>? headers,
+  }) {
+    return _engine.insertNext(
+      item,
+      cacheStore: cacheStore,
+      headers: headers,
+    );
+  }
+
+  /// Starts playback.
+  Future<void> play() => _engine.play();
+
+  /// Pauses playback.
+  Future<void> pause() => _engine.pause();
+
+  /// Seeks to a new position in the current track.
+  Future<void> seek(Duration position) => _engine.seek(position);
+
+  /// Jumps to a specific index in the queue.
+  Future<void> seekToIndex(int index) => _engine.seekToIndex(index);
+
+  /// Skips to the next track in the queue.
+  Future<void> skipNext() => _engine.skipNext();
+
+  /// Skips to the previous track in the queue.
+  Future<void> skipPrevious() => _engine.skipPrevious();
+
+  /// Sets the playback loop mode.
+  Future<void> setLoopMode(LoopMode mode) => _engine.setLoopMode(mode);
+
+  /// Clears upcoming items from the queue.
+  Future<void> clearQueue({bool keepCurrent = true}) {
+    return _engine.clearQueue(keepCurrent: keepCurrent);
+  }
+
+  /// Stops playback and releases resources.
+  Future<void> dispose() => _engine.dispose();
+}
+
+abstract class _PlaybackEngine {
+  Stream<Duration> get positionStream;
+  Duration get position;
+  Stream<Duration?> get durationStream;
+  Duration? get duration;
+  Stream<PlayerState> get playerStateStream;
+  Stream<int?> get currentIndexStream;
+  bool get isPlaying;
+  ProcessingState get processingState;
+  MediaItem? get currentMediaItem;
+  int? get currentIndex;
+
+  Future<void> setQueue(
+    List<MediaItem> items, {
+    int startIndex = 0,
+    Duration? startPosition,
+    CacheStore? cacheStore,
+    Map<String, String>? headers,
+  });
+
+  Future<void> setGaplessPlayback(bool enabled);
+
+  Future<void> appendToQueue(
+    MediaItem item, {
+    CacheStore? cacheStore,
+    Map<String, String>? headers,
+  });
+
+  Future<void> insertNext(
+    MediaItem item, {
+    CacheStore? cacheStore,
+    Map<String, String>? headers,
+  });
+
+  Future<void> play();
+  Future<void> pause();
+  Future<void> seek(Duration position);
+  Future<void> seekToIndex(int index);
+  Future<void> skipNext();
+  Future<void> skipPrevious();
+  Future<void> setLoopMode(LoopMode mode);
+  Future<void> clearQueue({bool keepCurrent = true});
+  Future<void> dispose();
+}
+
+class _JustAudioPlaybackEngine implements _PlaybackEngine {
+  _JustAudioPlaybackEngine({AudioPlayer? player})
+      : _player = player ?? AudioPlayer();
+
+  final AudioPlayer _player;
+  bool _gaplessPlayback = true;
+
+  @override
+  Stream<Duration> get positionStream => _player.positionStream;
+
+  @override
+  Duration get position => _player.position;
+
+  @override
+  Stream<Duration?> get durationStream => _player.durationStream;
+
+  @override
+  Duration? get duration => _player.duration;
+
+  @override
+  Stream<PlayerState> get playerStateStream => _player.playerStateStream;
+
+  @override
+  Stream<int?> get currentIndexStream => _player.currentIndexStream;
+
+  @override
+  bool get isPlaying => _player.playing;
+
+  @override
+  ProcessingState get processingState => _player.processingState;
+
+  @override
+  MediaItem? get currentMediaItem {
+    final tag = _player.sequenceState.currentSource?.tag;
+    if (tag is MediaItem) {
+      return tag;
+    }
+    if (tag is audio_service.MediaItem) {
+      final extras = tag.extras;
+      final raw = extras?['coppelia'];
+      if (raw is Map) {
+        return MediaItem.fromJson(raw.cast<String, dynamic>());
+      }
+    }
+    return null;
+  }
+
+  @override
+  int? get currentIndex => _player.currentIndex;
+
+  @override
+  Future<void> setQueue(
+    List<MediaItem> items, {
+    int startIndex = 0,
+    Duration? startPosition,
+    CacheStore? cacheStore,
+    Map<String, String>? headers,
+  }) async {
+    final logService = await LogService.instance;
+    const batchSize = 20;
+    final sources = <AudioSource>[];
+    final startTime = DateTime.now();
+
+    for (var i = 0; i < items.length; i += batchSize) {
+      final batchStart = DateTime.now();
+      final end = (i + batchSize).clamp(0, items.length);
+      final batch = items.sublist(i, end);
+      final batchSources = await Future.wait(
+        batch.map((item) => _buildSource(item, cacheStore, headers)),
+      );
+      sources.addAll(batchSources);
+      final batchTime = DateTime.now().difference(batchStart).inMilliseconds;
+      await logService.info(
+        'Queue batch ${i ~/ batchSize + 1}: '
+        '${batch.length} tracks in ${batchTime}ms',
+      );
+    }
+
+    final totalTime = DateTime.now().difference(startTime).inMilliseconds;
+    await logService.info(
+      'Total queue build: ${items.length} tracks in ${totalTime}ms',
+    );
+
+    if (sources.isEmpty) {
+      await _player.stop();
+      await _player.clearAudioSources();
+      return;
+    }
+
+    final targetIndex = startIndex.clamp(0, sources.length - 1);
+    await _player.setAudioSources(
+      sources,
+      initialIndex: targetIndex,
+      initialPosition: startPosition,
+      preload: _gaplessPlayback,
+    );
+  }
+
+  @override
+  Future<void> setGaplessPlayback(bool enabled) async {
+    _gaplessPlayback = enabled;
+    final sources = List<AudioSource>.from(_player.audioSources);
+    if (sources.isEmpty) {
+      return;
+    }
+    final currentIndex = _player.currentIndex;
+    if (currentIndex == null) {
+      return;
+    }
+    final position = _player.position;
+    final wasPlaying = _player.playing;
+    await _player.setAudioSources(
+      sources,
+      initialIndex: currentIndex,
+      initialPosition: position,
+      preload: _gaplessPlayback,
+    );
+    if (wasPlaying) {
+      await _player.play();
+    }
+  }
+
+  @override
+  Future<void> appendToQueue(
+    MediaItem item, {
+    CacheStore? cacheStore,
+    Map<String, String>? headers,
+  }) async {
+    final source = await _buildSource(item, cacheStore, headers);
+    await _player.addAudioSource(source);
+  }
+
+  @override
+  Future<void> insertNext(
+    MediaItem item, {
+    CacheStore? cacheStore,
+    Map<String, String>? headers,
+  }) async {
+    final source = await _buildSource(item, cacheStore, headers);
+    final insertIndex = (_player.currentIndex ?? -1) + 1;
+    final queueLength = _player.audioSources.length;
+    final targetIndex = insertIndex.clamp(0, queueLength);
+    await _player.insertAudioSource(targetIndex, source);
+  }
+
+  @override
+  Future<void> play() => _player.play();
+
+  @override
+  Future<void> pause() => _player.pause();
+
+  @override
+  Future<void> seek(Duration position) => _player.seek(position);
+
+  @override
+  Future<void> seekToIndex(int index) {
+    return _player.seek(Duration.zero, index: index);
+  }
+
+  @override
+  Future<void> skipNext() => _player.seekToNext();
+
+  @override
+  Future<void> skipPrevious() => _player.seekToPrevious();
+
+  @override
+  Future<void> setLoopMode(LoopMode mode) => _player.setLoopMode(mode);
+
+  @override
+  Future<void> clearQueue({bool keepCurrent = true}) async {
+    final sources = _player.audioSources;
+    if (sources.isEmpty) {
+      await _player.stop();
+      return;
+    }
+    final index = _player.currentIndex ?? -1;
+    if (keepCurrent && index >= 0) {
+      if (index + 1 < sources.length) {
+        await _player.removeAudioSourceRange(index + 1, sources.length);
+      }
+      return;
+    }
+    await _player.stop();
+    await _player.clearAudioSources();
+  }
+
+  @override
+  Future<void> dispose() => _player.dispose();
+
+  Future<AudioSource> _buildSource(
+    MediaItem item,
+    CacheStore? cacheStore,
+    Map<String, String>? headers,
+  ) async {
+    final tag = audio_service.MediaItem(
+      id: item.id,
+      title: item.title,
+      album: item.album,
+      artist:
+          item.artists.isNotEmpty ? item.artists.join(', ') : 'Unknown Artist',
+      duration: item.duration,
+      artUri: item.imageUrl == null ? null : Uri.parse(item.imageUrl!),
+      extras: <String, dynamic>{'coppelia': item.toJson()},
+    );
+    final file = cacheStore == null
+        ? null
+        : await cacheStore.getCachedAudio(item, touch: false);
+    final logService = await LogService.instance;
+    if (file != null) {
+      await logService.info('_buildSource: FILE "${item.title}" ${file.path}');
+      return AudioSource.file(file.path, tag: tag);
+    }
+    await logService
+        .info('_buildSource: URI "${item.title}" ${item.streamUrl}');
+    return AudioSource.uri(
+      Uri.parse(item.streamUrl),
+      headers: headers,
+      tag: tag,
+    );
+  }
+}
+
+class _MediaKitPlaybackEngine implements _PlaybackEngine {
+  _MediaKitPlaybackEngine({media_kit.Player? player})
       : _player = player ?? _createPlayer() {
     _setPositionAnchor(_player.state.position, index: _currentBackendIndex);
     _subscriptions.addAll([
       _player.stream.position.listen(_handleBackendPosition),
-      _player.stream.duration.listen(_handleBackendDuration),
+      _player.stream.duration.listen((_) => _emitDuration()),
       _player.stream.playing.listen((_) => _emitPlayerState()),
       _player.stream.buffering.listen((_) => _emitPlayerState()),
       _player.stream.completed.listen(_handleCompleted),
@@ -57,31 +452,31 @@ class PlaybackController {
     return media_kit.Player();
   }
 
-  /// Stream of playback position updates.
+  @override
   Stream<Duration> get positionStream => _positionController.stream;
 
-  /// Latest known playback position.
+  @override
   Duration get position => _projectedPosition(_positionClock.elapsed);
 
-  /// Stream of playback duration updates.
+  @override
   Stream<Duration?> get durationStream => _durationController.stream;
 
-  /// Latest known duration from the player, if available.
+  @override
   Duration? get duration => _durationForIndex(currentIndex);
 
-  /// Stream of play/pause state updates.
+  @override
   Stream<PlayerState> get playerStateStream => _playerStateController.stream;
 
-  /// Stream of the current queue index.
+  @override
   Stream<int?> get currentIndexStream => _currentIndexController.stream;
 
-  /// True when playback is active.
+  @override
   bool get isPlaying => _player.state.playing;
 
-  /// Latest playback processing state.
+  @override
   ProcessingState get processingState => _processingState;
 
-  /// The current media item from the queue.
+  @override
   MediaItem? get currentMediaItem {
     final index = currentIndex;
     if (index == null || index < 0 || index >= _queueItems.length) {
@@ -90,7 +485,7 @@ class PlaybackController {
     return _queueItems[index];
   }
 
-  /// Current queue index, if available.
+  @override
   int? get currentIndex => _positionAnchorIndex ?? _currentBackendIndex;
 
   int? get _currentBackendIndex {
@@ -101,7 +496,7 @@ class PlaybackController {
     return playlist.index;
   }
 
-  /// Sets the playback queue.
+  @override
   Future<void> setQueue(
     List<MediaItem> items, {
     int startIndex = 0,
@@ -146,13 +541,13 @@ class PlaybackController {
     _emitAll();
   }
 
-  /// Enables or disables gapless playback behavior.
+  @override
   Future<void> setGaplessPlayback(bool enabled) async {
     // media_kit does not expose just_audio's preload flag. Keep the method so
-    // existing settings remain harmless.
+    // existing settings remain harmless on desktop.
   }
 
-  /// Appends a track to the current queue.
+  @override
   Future<void> appendToQueue(
     MediaItem item, {
     CacheStore? cacheStore,
@@ -170,7 +565,7 @@ class PlaybackController {
     _emitAll();
   }
 
-  /// Inserts a track after the current item.
+  @override
   Future<void> insertNext(
     MediaItem item, {
     CacheStore? cacheStore,
@@ -193,7 +588,7 @@ class PlaybackController {
     _emitAll();
   }
 
-  /// Starts playback.
+  @override
   Future<void> play() async {
     final currentPosition = position;
     if (currentPosition > Duration.zero) {
@@ -205,7 +600,7 @@ class PlaybackController {
     _emitAll();
   }
 
-  /// Pauses playback.
+  @override
   Future<void> pause() async {
     final currentPosition = position;
     await _player.pause();
@@ -213,7 +608,7 @@ class PlaybackController {
     _emitAll();
   }
 
-  /// Seeks to a new position in the current track.
+  @override
   Future<void> seek(Duration position) async {
     final index = currentIndex;
     final targetPosition = _clampPosition(position, index: index);
@@ -225,7 +620,7 @@ class PlaybackController {
     _emitAll();
   }
 
-  /// Jumps to a specific index in the queue.
+  @override
   Future<void> seekToIndex(int index) async {
     if (index < 0 || index >= _queueItems.length) {
       return;
@@ -239,7 +634,7 @@ class PlaybackController {
     _emitAll();
   }
 
-  /// Skips to the next track in the queue.
+  @override
   Future<void> skipNext() async {
     final targetIndex = _nextProjectedIndex(currentIndex);
     if (targetIndex == null) {
@@ -248,7 +643,7 @@ class PlaybackController {
     await seekToIndex(targetIndex);
   }
 
-  /// Skips to the previous track in the queue.
+  @override
   Future<void> skipPrevious() async {
     final targetIndex = _previousProjectedIndex(currentIndex);
     if (targetIndex == null) {
@@ -257,29 +652,13 @@ class PlaybackController {
     await seekToIndex(targetIndex);
   }
 
-  /// Sets the playback loop mode.
+  @override
   Future<void> setLoopMode(LoopMode mode) async {
     _loopMode = mode;
     await _player.setPlaylistMode(_toMediaKitLoopMode(mode));
   }
 
-  /// Stops playback and releases resources.
-  Future<void> dispose() async {
-    if (_isDisposed) {
-      return;
-    }
-    _isDisposed = true;
-    for (final subscription in _subscriptions) {
-      await subscription.cancel();
-    }
-    await _positionController.close();
-    await _durationController.close();
-    await _playerStateController.close();
-    await _currentIndexController.close();
-    await _player.dispose();
-  }
-
-  /// Clears upcoming items from the queue.
+  @override
   Future<void> clearQueue({bool keepCurrent = true}) async {
     if (_queueItems.isEmpty) {
       await _player.stop();
@@ -316,6 +695,22 @@ class PlaybackController {
     _emitAll();
   }
 
+  @override
+  Future<void> dispose() async {
+    if (_isDisposed) {
+      return;
+    }
+    _isDisposed = true;
+    for (final subscription in _subscriptions) {
+      await subscription.cancel();
+    }
+    await _positionController.close();
+    await _durationController.close();
+    await _playerStateController.close();
+    await _currentIndexController.close();
+    await _player.dispose();
+  }
+
   void _handleBackendPosition(Duration rawPosition) {
     final index = currentIndex;
     final projected = _projectedPosition(_positionClock.elapsed);
@@ -326,10 +721,6 @@ class PlaybackController {
       _setPositionAnchor(projected, index: index);
     }
     _emitPosition();
-  }
-
-  void _handleBackendDuration(Duration _) {
-    _emitDuration();
   }
 
   void _handleCompleted(bool completed) {
@@ -429,16 +820,11 @@ class PlaybackController {
         : await cacheStore.getCachedAudio(item, touch: false);
     final logService = await LogService.instance;
     if (file != null) {
-      await logService
-          .info('_buildMedia: FILE "${item.title}" path=${file.path}');
+      await logService.info('_buildMedia: FILE "${item.title}" ${file.path}');
       return media_kit.Media(Uri.file(file.path).toString());
     }
-    await logService
-        .info('_buildMedia: URI "${item.title}" url=${item.streamUrl}');
-    return media_kit.Media(
-      item.streamUrl,
-      httpHeaders: headers,
-    );
+    await logService.info('_buildMedia: URI "${item.title}" ${item.streamUrl}');
+    return media_kit.Media(item.streamUrl, httpHeaders: headers);
   }
 
   int? _nextProjectedIndex(int? index) {
