@@ -13,6 +13,7 @@ import '../models/library_stats.dart';
 import '../models/media_item.dart';
 import '../models/playback_resume_state.dart';
 import '../models/playlist.dart';
+import 'log_service.dart';
 
 /// Manages cached metadata and audio assets.
 class CacheStore {
@@ -378,8 +379,9 @@ class CacheStore {
       await _audioCache.downloadFile(item.streamUrl);
       await _rememberCachedAudio(item);
       await enforceCacheLimit();
-    } catch (_) {
-      // Ignore failed prefetch attempts.
+    } catch (e) {
+      final log = await LogService.instance;
+      await log.warning('prefetchAudio failed for "${item.title}": $e');
     }
   }
 

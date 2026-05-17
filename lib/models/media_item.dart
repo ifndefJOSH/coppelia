@@ -115,8 +115,11 @@ class MediaItem {
       queryParameters: {
         'UserId': userId,
         'DeviceId': deviceId,
-        'Container': 'mp3',
-        'AudioCodec': 'mp3',
+        // List everything mpv can handle so Jellyfin direct-streams the
+        // original whenever the source is already in a supported codec,
+        // and only transcodes (to MP3) for formats we can't decode.
+        'Container': 'mp3,flac,ogg,wav,aac,m4a,opus,webma',
+        'AudioCodec': 'mp3,flac,vorbis,aac,opus,wav',
         'TranscodingContainer': 'mp3',
         'TranscodingProtocol': 'http',
         'api_key': token,

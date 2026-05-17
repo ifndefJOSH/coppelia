@@ -1125,9 +1125,9 @@ class AppState extends ChangeNotifier {
   }
 
   void _bindPlayback() {
-    _positionPollTimer =
-        Timer.periodic(const Duration(milliseconds: 250), (_) {
+    _positionPollTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
       final position = _playback.position;
+      _syncPlaybackIndexSnapshot();
       if (_position == position) {
         return;
       }
@@ -1150,24 +1150,33 @@ class AppState extends ChangeNotifier {
           'Player state: playing=${state.playing}, processingState=${state.processingState}'));
       _applyPlayerStateSnapshot(state);
     });
-    _currentIndexSubscription = _playback.currentIndexStream.listen((index) {
+    _currentIndexSubscription = _playback.currentIndexStream.listen((_) {
       if (_isApplyingQueueUpdate) {
         return;
       }
-      if (index == null || index < 0 || index >= _queue.length) {
-        return;
-      }
-      final didApply = _syncNowPlayingFromCurrentIndex(
-        notify: true,
-        indexOverride: index,
-        skipDuplicate: true,
-        logTrackChange: true,
-      );
-      if (!didApply) {
-        return;
-      }
-      unawaited(_cacheStore.handlePlaybackAdvance(_queue, index));
+      _syncPlaybackIndexSnapshot();
     });
+  }
+
+  void _syncPlaybackIndexSnapshot() {
+    if (_isApplyingQueueUpdate) {
+      return;
+    }
+    final previousIndex = _lastHandledCurrentIndex;
+    final didApply = _syncNowPlayingFromCurrentIndex(
+      notify: true,
+      skipDuplicate: true,
+      logTrackChange: true,
+    );
+    final index = _lastHandledCurrentIndex;
+    if (!didApply ||
+        index == null ||
+        index < 0 ||
+        index >= _queue.length ||
+        index == previousIndex) {
+      return;
+    }
+    unawaited(_cacheStore.handlePlaybackAdvance(_queue, index));
   }
 
   void _bindNowPlaying() {
@@ -1202,7 +1211,7 @@ class AppState extends ChangeNotifier {
     _nowPlaying = resume.track;
     _updatePlaybackProgress(
       position: resume.position,
-      duration: Duration.zero,
+      duration: resume.track.duration,
     );
     _playSessionId = _buildPlaySessionId(resume.track);
     _reportedStartSessionId = null;
@@ -1214,10 +1223,10 @@ class AppState extends ChangeNotifier {
       await _playback.setQueue(
         _queue,
         startIndex: 0,
+        startPosition: _position,
         cacheStore: _cacheStore,
         headers: _playbackHeaders(),
       );
-      await _playback.seek(_position);
     } catch (_) {
       // Ignore failures when restoring playback state.
     }
