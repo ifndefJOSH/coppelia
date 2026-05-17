@@ -32,6 +32,7 @@ class GenreDetailView extends StatelessWidget {
         : () => state.playShuffledList(displayTracks);
 
     return CollectionDetailView(
+      key: ValueKey(genre.id),
       title: genre.name,
       subtitle: '${genre.trackCount} tracks',
       imageUrl: genre.imageUrl,

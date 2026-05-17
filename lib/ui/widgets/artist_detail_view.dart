@@ -98,6 +98,7 @@ class _ArtistDetailViewState extends State<ArtistDetailView> {
         : null;
 
     return CollectionDetailView(
+      key: ValueKey(artist.id),
       title: artist.name,
       subtitle: subtitle,
       imageUrl: headerImageUrl,
