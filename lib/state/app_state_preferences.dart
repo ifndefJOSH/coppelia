@@ -298,9 +298,13 @@ extension AppStatePreferencesExtension on AppState {
 
   /// Refreshes cached media size counters.
   Future<void> refreshMediaCacheBytes() async {
-    final totalBytes = await _cacheStore.getMediaCacheBytes();
+    final entries = await _cacheStore.loadCachedAudioEntries();
+    _cachedAudio = entries.map((entry) => entry.streamUrl).toSet();
+    final totalBytes = entries.fold<int>(0, (sum, entry) => sum + entry.bytes);
     _mediaCacheBytesNotifier.value = totalBytes;
-    final pinnedBytes = await _cacheStore.getPinnedMediaBytes(_pinnedAudio);
+    final pinnedBytes = entries
+        .where((entry) => _pinnedAudio.contains(entry.streamUrl))
+        .fold<int>(0, (sum, entry) => sum + entry.bytes);
     _pinnedCacheBytesNotifier.value = pinnedBytes;
   }
 

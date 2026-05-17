@@ -57,13 +57,20 @@ extension AppStateSessionExtension on AppState {
     _sidebarWidth = await _settingsStore.loadSidebarWidth();
     _sidebarCollapsed = await _settingsStore.loadSidebarCollapsed();
     _smartLists = await _settingsStore.loadSmartLists();
-    _pinnedAudio = await _cacheStore.loadPinnedAudio();
+    final storedPinnedAudio = await _cacheStore.loadPinnedAudio();
+    _pinnedAudio =
+        storedPinnedAudio.map(_canonicalStreamUrlForStreamUrl).toSet();
+    if (!setEquals(_pinnedAudio, storedPinnedAudio)) {
+      await _cacheStore.savePinnedAudio(_pinnedAudio);
+    }
     _ensureHomeInHistory();
     unawaited(refreshMediaCacheBytes());
     await _loadCachedLibrary();
     await _applyPlaybackSettings();
     if (_offlineMode) {
       await _applyOfflineModeData();
+    } else {
+      unawaited(_resumePinnedDownloads());
     }
     await _restorePlaybackResumeState();
     unawaited(_maybeUpdateNowPlayingPalette(_nowPlaying));
@@ -156,6 +163,7 @@ extension AppStateSessionExtension on AppState {
     _downloadQueue.clear();
     _downloadStatusByUrl.clear();
     _cancelledOfflineRequests.clear();
+    _cachedAudio.clear();
     _isProcessingDownloads = false;
     _resetPlaybackRuntimeState(clearNowPlaying: true, clearReporting: true);
     _lastPlaybackPersistAt = null;

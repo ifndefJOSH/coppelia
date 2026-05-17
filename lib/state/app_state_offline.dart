@@ -234,7 +234,7 @@ extension AppStateOfflineExtension on AppState {
     MediaItem track, {
     bool requiresWifi = false,
   }) async {
-    final normalized = _normalizeTrackForPlayback(track);
+    final normalized = _normalizeTrackForOffline(track);
     _cancelledOfflineRequests.remove(normalized.streamUrl);
     final existingIndex = _indexOfDownload(normalized.streamUrl);
     if (existingIndex != null) {
@@ -247,6 +247,7 @@ extension AppStateOfflineExtension on AppState {
     final cached = await _cacheStore.isAudioCached(normalized);
     if (cached) {
       await _cacheStore.touchCachedAudio(normalized);
+      _cachedAudio.add(normalized.streamUrl);
       return;
     }
     _addDownloadTask(
@@ -259,6 +260,46 @@ extension AppStateOfflineExtension on AppState {
     );
     _notify();
     unawaited(_processDownloadQueue());
+  }
+
+  Future<void> _resumePinnedDownloads() async {
+    if (_offlineMode) {
+      return;
+    }
+    final pinnedTracks = await _cacheStore.loadPinnedAudioItems();
+    var queuedAny = false;
+    for (final track in pinnedTracks) {
+      final normalized = _normalizeTrackForOffline(track);
+      if (!_pinnedAudio.contains(normalized.streamUrl)) {
+        continue;
+      }
+      if (_cachedAudio.contains(normalized.streamUrl)) {
+        continue;
+      }
+      if (await _cacheStore.isAudioCached(normalized)) {
+        _cachedAudio.add(normalized.streamUrl);
+        continue;
+      }
+      if (_indexOfDownload(normalized.streamUrl) != null) {
+        continue;
+      }
+      _addDownloadTask(
+        DownloadTask(
+          track: normalized,
+          status: DownloadStatus.queued,
+          queuedAt: DateTime.now(),
+          requiresWifi: _autoDownloadFavoritesWifiOnly,
+        ),
+      );
+      queuedAny = true;
+    }
+    if (!queuedAny) {
+      return;
+    }
+    _notify();
+    if (!_downloadsPaused) {
+      unawaited(_processDownloadQueue());
+    }
   }
 
   void _resetWaitingDownloads() {
@@ -396,6 +437,7 @@ extension AppStateOfflineExtension on AppState {
             downloadedBytes: response.downloaded,
           );
         } else if (response is FileInfo) {
+          _cachedAudio.add(streamUrl);
           _removeDownload(streamUrl);
           unawaited(refreshMediaCacheBytes());
         }
@@ -494,16 +536,26 @@ extension AppStateOfflineExtension on AppState {
     bool requiresWifi = false,
   }) async {
     for (final track in tracks) {
+      final normalized = _normalizeTrackForOffline(track);
+      final keys = _offlineKeysForTrack(track);
       if (pinned) {
-        _cancelledOfflineRequests.remove(track.streamUrl);
-        await _cacheStore.setPinnedAudio(track.streamUrl, true);
-        _pinnedAudio.add(track.streamUrl);
-        await _queueDownload(track, requiresWifi: requiresWifi);
+        for (final key in keys) {
+          _cancelledOfflineRequests.remove(key);
+        }
+        await _cacheStore.setPinnedAudioItem(normalized, true);
+        _pinnedAudio.add(normalized.streamUrl);
+        for (final key in keys.where((key) => key != normalized.streamUrl)) {
+          await _cacheStore.setPinnedAudio(key, false);
+          _pinnedAudio.remove(key);
+        }
+        await _queueDownload(normalized, requiresWifi: requiresWifi);
       } else {
-        _cancelledOfflineRequests.add(track.streamUrl);
-        await _cacheStore.setPinnedAudio(track.streamUrl, false);
-        _pinnedAudio.remove(track.streamUrl);
-        _removeDownload(track.streamUrl);
+        for (final key in keys) {
+          _cancelledOfflineRequests.add(key);
+          await _cacheStore.setPinnedAudio(key, false);
+          _pinnedAudio.remove(key);
+          _removeDownload(key);
+        }
       }
     }
     _refreshSelectedSmartList();
@@ -563,10 +615,16 @@ extension AppStateOfflineExtension on AppState {
 
   /// Returns whether a track is pinned for offline playback.
   Future<bool> isTrackPinned(MediaItem track) async {
+    final keys = _offlineKeysForTrack(track);
     if (_pinnedAudio.isNotEmpty) {
-      return _pinnedAudio.contains(track.streamUrl);
+      return keys.any(_pinnedAudio.contains);
     }
-    return _cacheStore.isPinnedAudio(track.streamUrl);
+    for (final key in keys) {
+      if (await _cacheStore.isPinnedAudio(key)) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /// Returns whether any tracks in an album are pinned for offline playback.
@@ -576,7 +634,7 @@ extension AppStateOfflineExtension on AppState {
     }
     final tracks = await _cacheStore.loadAlbumTracks(album.id);
     if (tracks.isNotEmpty) {
-      return tracks.any((track) => _pinnedAudio.contains(track.streamUrl));
+      return tracks.any(_isTrackPinnedInMemory);
     }
     final cachedEntries = await _cacheStore.loadCachedAudioEntries();
     final albumName = album.name.trim().toLowerCase();
@@ -594,7 +652,7 @@ extension AppStateOfflineExtension on AppState {
     }
     final tracks = await _cacheStore.loadArtistTracks(artist.id);
     if (tracks.isNotEmpty) {
-      return tracks.any((track) => _pinnedAudio.contains(track.streamUrl));
+      return tracks.any(_isTrackPinnedInMemory);
     }
     final cachedEntries = await _cacheStore.loadCachedAudioEntries();
     final artistName = artist.name.trim().toLowerCase();
@@ -669,7 +727,7 @@ extension AppStateOfflineExtension on AppState {
     final offline = <Playlist>[];
     for (final playlist in playlists) {
       final tracks = await _cacheStore.loadPlaylistTracks(playlist.id);
-      if (tracks.any((track) => _pinnedAudio.contains(track.streamUrl))) {
+      if (tracks.any(_isTrackPinnedInMemory)) {
         offline.add(playlist);
       }
     }
@@ -708,7 +766,9 @@ extension AppStateOfflineExtension on AppState {
     _isLoadingLibrary = true;
     clearSearch(notify: false);
     _notify();
-    _pinnedAudio = await _cacheStore.loadPinnedAudio();
+    _pinnedAudio = (await _cacheStore.loadPinnedAudio())
+        .map(_canonicalStreamUrlForStreamUrl)
+        .toSet();
     final offlineTracks = await loadOfflineTracks();
     final offlineAlbums = await loadOfflineAlbums();
     final offlineArtists = await loadOfflineArtists();
