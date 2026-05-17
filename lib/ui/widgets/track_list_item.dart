@@ -52,12 +52,13 @@ class TrackListItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final trackListStyle = context.select((AppState state) => state.trackListStyle);
+    final trackListStyle =
+        context.select((AppState state) => state.trackListStyle);
     final showTrackStatusIcons = context.select(
       (AppState state) => state.trackStatusIconsEnabled,
     );
     final statusIconState = context.select(
-      (AppState state) => state.trackStatusForStreamUrl(track.streamUrl),
+      (AppState state) => state.trackStatusForTrack(track),
     );
 
     if (trackListStyle == TrackListStyle.table) {

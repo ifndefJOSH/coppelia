@@ -5,6 +5,7 @@ import 'package:mocktail/mocktail.dart';
 
 import 'package:coppelia/models/media_item.dart';
 import 'package:coppelia/models/playlist.dart';
+import 'package:coppelia/models/cached_audio_entry.dart';
 import 'package:coppelia/models/download_task.dart';
 import 'package:coppelia/models/track_status_icon_state.dart';
 import 'package:coppelia/services/cache_store.dart';
@@ -75,8 +76,20 @@ void main() {
       () => cacheStore.getPinnedMediaBytes(any()),
     ).thenAnswer((_) async => 0);
     when(
+      () => cacheStore.loadCachedAudioEntries(),
+    ).thenAnswer((_) async => const <CachedAudioEntry>[]);
+    when(
       () => cacheStore.setPinnedAudio(any(), any()),
     ).thenAnswer((_) async {});
+    when(
+      () => cacheStore.setPinnedAudioItem(any(), any()),
+    ).thenAnswer((_) async {});
+    when(
+      () => cacheStore.savePinnedAudio(any()),
+    ).thenAnswer((_) async {});
+    when(
+      () => cacheStore.loadPinnedAudioItems(),
+    ).thenAnswer((_) async => const <MediaItem>[]);
     when(
       () => cacheStore.isAudioCached(any()),
     ).thenAnswer((_) async => true);
@@ -92,7 +105,8 @@ void main() {
         headers: any(named: 'headers'),
       ),
     ).thenAnswer((_) => const Stream<FileResponse>.empty());
-    when(() => settingsStore.saveDownloadsPaused(any())).thenAnswer((_) async {});
+    when(() => settingsStore.saveDownloadsPaused(any()))
+        .thenAnswer((_) async {});
 
     return AppState(
       cacheStore: cacheStore,
@@ -137,7 +151,7 @@ void main() {
       expect(state.downloadQueue, isEmpty);
       verifyNever(() => client.fetchPlaylistTracks(any()));
       for (final track in tracks) {
-        verify(() => cacheStore.setPinnedAudio(track.streamUrl, true)).called(1);
+        verify(() => cacheStore.setPinnedAudioItem(track, true)).called(1);
         verify(() => cacheStore.isAudioCached(track)).called(1);
         verify(() => cacheStore.touchCachedAudio(track)).called(1);
       }
@@ -177,9 +191,9 @@ void main() {
       await state.makePlaylistAvailableOffline(playlist);
 
       verify(() => client.fetchPlaylistTracks(playlist.id)).called(1);
-      verify(() => cacheStore.savePlaylistTracks(playlist.id, tracks)).called(1);
-      verify(() => cacheStore.setPinnedAudio(tracks.first.streamUrl, true))
+      verify(() => cacheStore.savePlaylistTracks(playlist.id, tracks))
           .called(1);
+      verify(() => cacheStore.setPinnedAudioItem(tracks.first, true)).called(1);
       expect(state.pinnedAudio, contains(tracks.first.streamUrl));
     });
 
@@ -217,7 +231,8 @@ void main() {
 
       expect(state.pinnedAudio, isEmpty);
       for (final track in tracks) {
-        verify(() => cacheStore.setPinnedAudio(track.streamUrl, false)).called(1);
+        verify(() => cacheStore.setPinnedAudio(track.streamUrl, false))
+            .called(1);
       }
     });
   });
@@ -265,7 +280,8 @@ void main() {
       addTearDown(state.dispose);
 
       final track = _track('status-queued');
-      when(() => cacheStore.isAudioCached(track)).thenAnswer((_) async => false);
+      when(() => cacheStore.isAudioCached(track))
+          .thenAnswer((_) async => false);
       await state.setDownloadsPaused(true);
       await state.makeTrackAvailableOffline(track);
 
@@ -293,13 +309,15 @@ void main() {
       addTearDown(state.dispose);
 
       final track = _track('status-failed');
-      when(() => cacheStore.isAudioCached(track)).thenAnswer((_) async => false);
+      when(() => cacheStore.isAudioCached(track))
+          .thenAnswer((_) async => false);
       when(
         () => cacheStore.downloadAudioWithProgress(
           track,
           headers: any(named: 'headers'),
         ),
-      ).thenAnswer((_) => Stream<FileResponse>.error(Exception('download failed')));
+      ).thenAnswer(
+          (_) => Stream<FileResponse>.error(Exception('download failed')));
 
       await state.makeTrackAvailableOffline(track);
       await Future<void>.delayed(Duration.zero);

@@ -1,3 +1,5 @@
+import 'media_item.dart';
+
 /// Represents a cached audio file with metadata.
 class CachedAudioEntry {
   /// Creates a cached audio entry.
@@ -8,6 +10,7 @@ class CachedAudioEntry {
     required this.artists,
     required this.cachedAt,
     required this.bytes,
+    this.mediaItem,
   });
 
   /// Stream URL used as cache key.
@@ -27,6 +30,9 @@ class CachedAudioEntry {
 
   /// File size in bytes.
   final int bytes;
+
+  /// Full track metadata captured when the audio was cached.
+  final MediaItem? mediaItem;
 
   /// Returns a user-friendly artist label.
   String get artistLabel =>

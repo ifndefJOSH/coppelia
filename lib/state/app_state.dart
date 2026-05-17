@@ -135,6 +135,7 @@ class AppState extends ChangeNotifier {
   final Set<String> _favoriteArtistUpdatesInFlight = {};
   final Set<String> _favoriteTrackUpdatesInFlight = {};
   Set<String> _pinnedAudio = {};
+  Set<String> _cachedAudio = {};
   final List<DownloadTask> _downloadQueue = [];
   final Map<String, DownloadStatus> _downloadStatusByUrl = {};
   final Map<String, DateTime> _downloadProgressTimestamps = {};
@@ -644,15 +645,46 @@ class AppState extends ChangeNotifier {
 
   /// O(1) lookup for timestamp status icon state by stream URL.
   TrackStatusIconState trackStatusForStreamUrl(String streamUrl) {
-    final status = _downloadStatusByUrl[streamUrl];
-    if (status != null) {
-      if (status != DownloadStatus.failed) {
-        return TrackStatusIconState.inQueue;
+    final keys = _offlineKeysForStreamUrl(streamUrl);
+    for (final key in keys) {
+      final status = _downloadStatusByUrl[key];
+      if (status == null) {
+        continue;
       }
-      return TrackStatusIconState.none;
+      return status == DownloadStatus.failed
+          ? TrackStatusIconState.none
+          : TrackStatusIconState.inQueue;
     }
-    if (_pinnedAudio.contains(streamUrl)) {
+    final isPinned = keys.any(_pinnedAudio.contains);
+    final isCached = keys.any(_cachedAudio.contains);
+    if (isPinned && isCached) {
       return TrackStatusIconState.downloaded;
+    }
+    if (isPinned) {
+      return TrackStatusIconState.inQueue;
+    }
+    return TrackStatusIconState.none;
+  }
+
+  /// O(1) lookup for timestamp status icon state by track.
+  TrackStatusIconState trackStatusForTrack(MediaItem track) {
+    final keys = _offlineKeysForTrack(track);
+    for (final key in keys) {
+      final status = _downloadStatusByUrl[key];
+      if (status == null) {
+        continue;
+      }
+      return status == DownloadStatus.failed
+          ? TrackStatusIconState.none
+          : TrackStatusIconState.inQueue;
+    }
+    final isPinned = keys.any(_pinnedAudio.contains);
+    final isCached = keys.any(_cachedAudio.contains);
+    if (isPinned && isCached) {
+      return TrackStatusIconState.downloaded;
+    }
+    if (isPinned) {
+      return TrackStatusIconState.inQueue;
     }
     return TrackStatusIconState.none;
   }
@@ -1003,7 +1035,7 @@ class AppState extends ChangeNotifier {
 
   /// Adds a track to the end of the queue.
   Future<void> enqueueTrack(MediaItem track) async {
-    if (_offlineMode && !_pinnedAudio.contains(track.streamUrl)) {
+    if (_offlineMode && !_isTrackPinnedInMemory(track)) {
       return;
     }
     if (_queue.isEmpty) {
@@ -1022,7 +1054,7 @@ class AppState extends ChangeNotifier {
 
   /// Inserts a track to play next.
   Future<void> playNext(MediaItem track) async {
-    if (_offlineMode && !_pinnedAudio.contains(track.streamUrl)) {
+    if (_offlineMode && !_isTrackPinnedInMemory(track)) {
       return;
     }
     if (_queue.isEmpty) {
@@ -1089,7 +1121,51 @@ class AppState extends ChangeNotifier {
     return segments[index + 1];
   }
 
+  String _canonicalStreamUrlForStreamUrl(String streamUrl) {
+    final session = _session;
+    if (session == null) {
+      return streamUrl;
+    }
+    final itemId = _extractStreamItemId(streamUrl);
+    if (itemId == streamUrl) {
+      return streamUrl;
+    }
+    final canonical = _client.buildStreamUrl(
+      itemId: itemId,
+      userId: session.userId,
+      token: session.accessToken,
+    );
+    return canonical.isEmpty ? streamUrl : canonical;
+  }
+
+  MediaItem _normalizeTrackForOffline(MediaItem track) {
+    return _normalizeTrackForPlayback(track);
+  }
+
+  Set<String> _offlineKeysForStreamUrl(String streamUrl) {
+    final canonical = _canonicalStreamUrlForStreamUrl(streamUrl);
+    return {streamUrl, canonical};
+  }
+
+  Set<String> _offlineKeysForTrack(MediaItem track) {
+    final canonical = _canonicalStreamUrlForStreamUrl(track.streamUrl);
+    return {track.streamUrl, canonical};
+  }
+
+  bool _isTrackPinnedInMemory(MediaItem track) {
+    return _offlineKeysForTrack(track).any(_pinnedAudio.contains);
+  }
+
+  bool _isTrackOfflineReadyInMemory(MediaItem track) {
+    final keys = _offlineKeysForTrack(track);
+    return keys.any(_pinnedAudio.contains) && keys.any(_cachedAudio.contains);
+  }
+
   MediaItem _mediaItemFromCachedEntry(CachedAudioEntry entry) {
+    final mediaItem = entry.mediaItem;
+    if (mediaItem != null) {
+      return mediaItem;
+    }
     final uri = Uri.tryParse(entry.streamUrl);
     final itemId = _extractStreamItemId(entry.streamUrl);
     final origin = uri?.origin ?? '';
@@ -1559,9 +1635,7 @@ class AppState extends ChangeNotifier {
     if (_pinnedAudio.isEmpty) {
       return [];
     }
-    return tracks
-        .where((track) => _pinnedAudio.contains(track.streamUrl))
-        .toList();
+    return tracks.where(_isTrackPinnedInMemory).toList();
   }
 
   Future<List<MediaItem>> _offlineTracksForAlbum(Album album) async {
@@ -1774,6 +1848,9 @@ class AppState extends ChangeNotifier {
       return;
     }
     final isCached = await _cacheStore.isAudioCached(track);
+    if (isCached) {
+      _cachedAudio.addAll(_offlineKeysForTrack(track));
+    }
     // Don't reassert "preparing" if the player has already reached ready —
     // the player-state listener may have just cleared it, and there's no
     // future state event guaranteed to clear it again.

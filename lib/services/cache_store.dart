@@ -23,6 +23,7 @@ class CacheStore {
   /// Default cache size limit (500 MB).
   static const int defaultCacheMaxBytes = 500 * 1024 * 1024;
 
+  static const _audioCacheKey = 'coppelia_audio_cache';
   static const _playlistsKey = 'cached_playlists';
   static const _tracksKey = 'cached_playlist_tracks';
   static const _featuredKey = 'cached_featured_tracks';
@@ -41,9 +42,16 @@ class CacheStore {
   static const _cachedAudioKey = 'cached_audio_entries';
   static const _cachedAudioLimitKey = 'cached_audio_limit_bytes';
   static const _pinnedAudioKey = 'cached_audio_pins';
+  static const _pinnedAudioItemsKey = 'cached_audio_pin_items';
   static const _playbackResumeKey = 'cached_playback_resume';
 
-  final DefaultCacheManager _audioCache = DefaultCacheManager();
+  final CacheManager _audioCache = CacheManager(
+    Config(
+      _audioCacheKey,
+      stalePeriod: const Duration(days: 3650),
+      maxNrOfCacheObjects: 20000,
+    ),
+  );
 
   /// Persists playlists for offline use.
   Future<void> savePlaylists(List<Playlist> playlists) async {
@@ -360,7 +368,7 @@ class CacheStore {
 
   /// Returns a cached audio file if present.
   Future<File?> getCachedAudio(MediaItem item, {bool touch = false}) async {
-    final cached = await _audioCache.getFileFromCache(item.streamUrl);
+    final cached = await _getAudioCacheInfo(item.streamUrl);
     if (touch && cached != null) {
       await _rememberCachedAudio(item);
     }
@@ -369,7 +377,7 @@ class CacheStore {
 
   /// Returns true when the audio is cached on disk.
   Future<bool> isAudioCached(MediaItem item) async {
-    final cached = await _audioCache.getFileFromCache(item.streamUrl);
+    final cached = await _getAudioCacheInfo(item.streamUrl);
     return cached != null;
   }
 
@@ -406,7 +414,7 @@ class CacheStore {
 
   /// Updates the LRU timestamp for a cached track.
   Future<void> touchCachedAudio(MediaItem item) async {
-    final cached = await _audioCache.getFileFromCache(item.streamUrl);
+    final cached = await _getAudioCacheInfo(item.streamUrl);
     if (cached == null) {
       return;
     }
@@ -465,6 +473,10 @@ class CacheStore {
 
   /// Clears cached audio files.
   Future<void> clearAudioCache() async {
+    final entries = await loadCachedAudioEntries();
+    for (final entry in entries) {
+      await _deleteAudioFile(entry.streamUrl);
+    }
     try {
       await _audioCache.emptyCache();
     } catch (_) {}
@@ -481,22 +493,8 @@ class CacheStore {
 
   /// Returns the approximate size of cached media on disk.
   Future<int> getMediaCacheBytes() async {
-    try {
-      final directory = await getMediaCacheDirectory();
-      if (!await directory.exists()) {
-        return 0;
-      }
-      var total = 0;
-      await for (final entity
-          in directory.list(recursive: true, followLinks: false)) {
-        if (entity is File) {
-          total += await entity.length();
-        }
-      }
-      return total;
-    } catch (_) {
-      return 0;
-    }
+    final entries = await loadCachedAudioEntries();
+    return entries.fold<int>(0, (sum, entry) => sum + entry.bytes);
   }
 
   /// Returns the total bytes used by pinned tracks.
@@ -545,12 +543,13 @@ class CacheStore {
         toRemove.add(entry.key);
         continue;
       }
-      final cacheInfo = await _audioCache.getFileFromCache(entry.key);
+      final cacheInfo = await _getAudioCacheInfo(entry.key);
       if (cacheInfo == null) {
         toRemove.add(entry.key);
         continue;
       }
       final bytes = await cacheInfo.file.length();
+      final mediaItem = _mediaItemFromCachedPayload(value);
       final artists = (value['artists'] as List<dynamic>? ?? const [])
           .map((artist) => artist.toString())
           .toList();
@@ -566,6 +565,7 @@ class CacheStore {
           artists: artists,
           cachedAt: cachedAt,
           bytes: bytes,
+          mediaItem: mediaItem,
         ),
       );
     }
@@ -628,7 +628,7 @@ class CacheStore {
   Future<void> _deleteAudioFile(String streamUrl) async {
     File? cachedFile;
     try {
-      final cacheInfo = await _audioCache.getFileFromCache(streamUrl);
+      final cacheInfo = await _getAudioCacheInfo(streamUrl);
       cachedFile = cacheInfo?.file;
     } catch (_) {}
     try {
@@ -709,9 +709,26 @@ class CacheStore {
       'title': item.title,
       'album': item.album,
       'artists': item.artists,
+      'mediaItem': item.toJson(),
       'cachedAt': DateTime.now().toIso8601String(),
     };
     await _saveCachedAudioEntries(decoded);
+  }
+
+  Future<FileInfo?> _getAudioCacheInfo(String streamUrl) async {
+    return _audioCache.getFileFromCache(streamUrl);
+  }
+
+  MediaItem? _mediaItemFromCachedPayload(Map<String, dynamic> payload) {
+    final raw = payload['mediaItem'];
+    if (raw is! Map) {
+      return null;
+    }
+    try {
+      return MediaItem.fromJson(raw.cast<String, dynamic>());
+    } catch (_) {
+      return null;
+    }
   }
 
   Future<void> _forgetCachedAudio(String streamUrl) async {
@@ -750,8 +767,24 @@ class CacheStore {
       current.add(streamUrl);
     } else {
       current.remove(streamUrl);
+      await _forgetPinnedAudioItem(streamUrl);
     }
     await _savePinnedAudio(current);
+  }
+
+  /// Pins or unpins a track and persists enough metadata to resume downloads.
+  Future<void> setPinnedAudioItem(MediaItem item, bool pinned) async {
+    await setPinnedAudio(item.streamUrl, pinned);
+    if (!pinned) {
+      return;
+    }
+    final preferences = await SharedPreferences.getInstance();
+    final raw = preferences.getString(_pinnedAudioItemsKey);
+    final Map<String, dynamic> decoded = raw == null || raw.isEmpty
+        ? {}
+        : jsonDecode(raw) as Map<String, dynamic>;
+    decoded[item.streamUrl] = item.toJson();
+    await preferences.setString(_pinnedAudioItemsKey, jsonEncode(decoded));
   }
 
   /// Returns whether a track is pinned for offline playback.
@@ -763,6 +796,57 @@ class CacheStore {
   /// Loads pinned track URLs for offline playback.
   Future<Set<String>> loadPinnedAudio() async {
     return _loadPinnedAudio();
+  }
+
+  /// Loads metadata for tracks that are pinned for offline playback.
+  Future<List<MediaItem>> loadPinnedAudioItems() async {
+    final pinned = await _loadPinnedAudio();
+    if (pinned.isEmpty) {
+      return [];
+    }
+    final preferences = await SharedPreferences.getInstance();
+    final raw = preferences.getString(_pinnedAudioItemsKey);
+    if (raw == null || raw.isEmpty) {
+      return [];
+    }
+    final decoded = jsonDecode(raw) as Map<String, dynamic>;
+    final items = <MediaItem>[];
+    final toRemove = <String>[];
+    for (final entry in decoded.entries) {
+      final value = entry.value;
+      if (value is! Map) {
+        toRemove.add(entry.key);
+        continue;
+      }
+      try {
+        items.add(MediaItem.fromJson(value.cast<String, dynamic>()));
+      } catch (_) {
+        toRemove.add(entry.key);
+      }
+    }
+    if (toRemove.isNotEmpty) {
+      for (final key in toRemove) {
+        decoded.remove(key);
+      }
+      await preferences.setString(_pinnedAudioItemsKey, jsonEncode(decoded));
+    }
+    return items;
+  }
+
+  /// Replaces pinned track URLs after canonicalization or migration.
+  Future<void> savePinnedAudio(Set<String> urls) async {
+    await _savePinnedAudio(urls);
+  }
+
+  Future<void> _forgetPinnedAudioItem(String streamUrl) async {
+    final preferences = await SharedPreferences.getInstance();
+    final raw = preferences.getString(_pinnedAudioItemsKey);
+    if (raw == null || raw.isEmpty) {
+      return;
+    }
+    final decoded = jsonDecode(raw) as Map<String, dynamic>;
+    decoded.remove(streamUrl);
+    await preferences.setString(_pinnedAudioItemsKey, jsonEncode(decoded));
   }
 
   Future<void> _forgetCachedAudioEntries(Set<String> streamUrls) async {
