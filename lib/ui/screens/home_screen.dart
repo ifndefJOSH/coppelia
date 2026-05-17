@@ -34,11 +34,11 @@ import '../widgets/artwork_image.dart';
 import '../widgets/search_results_view.dart';
 import '../widgets/settings_view.dart';
 import '../widgets/sidebar_navigation.dart';
-import '../widgets/track_list_item.dart';
 import '../widgets/sidebar_resize_handle.dart';
 import '../widgets/genre_detail_view.dart';
 import '../widgets/play_history_view.dart';
 import '../widgets/queue_view.dart';
+import '../widgets/track_list_view.dart';
 import '../widgets/tracks_view.dart';
 import '../widgets/header_controls.dart';
 import '../widgets/library_browse_view.dart';
@@ -521,41 +521,11 @@ class _HomeFeaturedView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.read<AppState>();
-    if (tracks.isEmpty) {
-      return const LibraryPlaceholderView(view: LibraryView.homeFeatured);
-    }
-    return ListView.separated(
-      itemCount: tracks.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 6),
-      itemBuilder: (context, index) {
-        final track = tracks[index];
-        return TrackListItem(
-          track: track,
-          index: index,
-          isActive: false,
-          onTap: () => state.playFromList(tracks, track),
-          onPlayNext: () => state.playNext(track),
-          onAddToQueue: () => state.enqueueTrack(track),
-          isFavorite: state.isFavoriteTrack(track.id),
-          isFavoriteUpdating: state.isFavoriteTrackUpdating(track.id),
-          onToggleFavorite: () => state.setTrackFavorite(
-            track,
-            !state.isFavoriteTrack(track.id),
-          ),
-          onAlbumTap: track.albumId == null
-              ? null
-              : () => state.selectAlbumById(track.albumId!),
-          onArtistTap: track.artistIds.isEmpty
-              ? null
-              : () => state.selectArtistById(track.artistIds.first),
-          onGoToAlbum: track.albumId == null
-              ? null
-              : () => state.selectAlbumById(track.albumId!),
-          onGoToArtist: track.artistIds.isEmpty
-              ? null
-              : () => state.selectArtistById(track.artistIds.first),
-        );
-      },
+    return TrackListView(
+      title: LibraryView.homeFeatured.title,
+      subtitle: '${tracks.length} tracks',
+      tracks: tracks,
+      onTapTrack: (track, _) => state.playFromList(tracks, track),
     );
   }
 }
@@ -570,41 +540,11 @@ class _HomeRecentView extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.read<AppState>();
     final effectiveTracks = tracks.isNotEmpty ? tracks : fallback;
-    if (effectiveTracks.isEmpty) {
-      return const LibraryPlaceholderView(view: LibraryView.homeRecent);
-    }
-    return ListView.separated(
-      itemCount: effectiveTracks.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 6),
-      itemBuilder: (context, index) {
-        final track = effectiveTracks[index];
-        return TrackListItem(
-          track: track,
-          index: index,
-          isActive: false,
-          onTap: () => state.playFromList(effectiveTracks, track),
-          onPlayNext: () => state.playNext(track),
-          onAddToQueue: () => state.enqueueTrack(track),
-          isFavorite: state.isFavoriteTrack(track.id),
-          isFavoriteUpdating: state.isFavoriteTrackUpdating(track.id),
-          onToggleFavorite: () => state.setTrackFavorite(
-            track,
-            !state.isFavoriteTrack(track.id),
-          ),
-          onAlbumTap: track.albumId == null
-              ? null
-              : () => state.selectAlbumById(track.albumId!),
-          onArtistTap: track.artistIds.isEmpty
-              ? null
-              : () => state.selectArtistById(track.artistIds.first),
-          onGoToAlbum: track.albumId == null
-              ? null
-              : () => state.selectAlbumById(track.albumId!),
-          onGoToArtist: track.artistIds.isEmpty
-              ? null
-              : () => state.selectArtistById(track.artistIds.first),
-        );
-      },
+    return TrackListView(
+      title: LibraryView.homeRecent.title,
+      subtitle: '${effectiveTracks.length} tracks',
+      tracks: effectiveTracks,
+      onTapTrack: (track, _) => state.playFromList(effectiveTracks, track),
     );
   }
 }
