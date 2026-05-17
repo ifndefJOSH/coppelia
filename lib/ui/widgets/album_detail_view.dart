@@ -83,6 +83,7 @@ class AlbumDetailView extends StatelessWidget {
         : null;
 
     return CollectionDetailView(
+      key: ValueKey(album.id),
       title: album.name,
       subtitle: subtitle,
       subtitleWidget: subtitleWidget,

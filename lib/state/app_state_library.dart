@@ -9,14 +9,22 @@ extension AppStateLibraryExtension on AppState {
     if (_selectedView != LibraryView.home) {
       _recordViewHistory(_selectedView);
     }
+    final isSamePlaylist = _selectedPlaylist?.id == playlist.id;
     _selectedPlaylist = playlist;
     _selectedSmartList = null;
+    _smartListTracks = [];
     _selectedView = LibraryView.home;
     _offlineOnlyFilter = offlineOnly;
+    if (!isSamePlaylist) {
+      _playlistTracks = [];
+    }
     clearBrowseSelection(notify: false);
     clearSearch(notify: false);
     _notify();
     final cached = await _cacheStore.loadPlaylistTracks(playlist.id);
+    if (_selectedPlaylist?.id != playlist.id) {
+      return;
+    }
     if (cached.isNotEmpty) {
       _playlistTracks = cached;
       _notify();
@@ -26,9 +34,12 @@ extension AppStateLibraryExtension on AppState {
     }
     try {
       final tracks = await _client.fetchPlaylistTracks(playlist.id);
+      if (_selectedPlaylist?.id != playlist.id) {
+        return;
+      }
       _playlistTracks = tracks;
-      await _cacheStore.savePlaylistTracks(playlist.id, tracks);
       _notify();
+      await _cacheStore.savePlaylistTracks(playlist.id, tracks);
     } catch (_) {
       // Keep cached tracks if refresh fails.
     }
@@ -1383,30 +1394,52 @@ extension AppStateLibraryExtension on AppState {
     if (_selectedView != LibraryView.home) {
       _recordViewHistory(_selectedView);
     }
-    _selectedAlbum = album;
+    final isSameAlbum = _selectedAlbum?.id == album.id;
+    _selectedPlaylist = null;
+    _playlistTracks = [];
     _selectedSmartList = null;
+    _smartListTracks = [];
+    _selectedAlbum = album;
     _selectedArtist = null;
     _selectedGenre = null;
+    if (!isSameAlbum) {
+      _albumTracks = [];
+    }
+    _artistTracks = [];
+    _genreTracks = [];
     _offlineOnlyFilter = offlineOnly;
     clearSearch(notify: false);
     _notify();
     final cached = await _cacheStore.loadAlbumTracks(album.id);
+    if (_selectedAlbum?.id != album.id) {
+      return;
+    }
     if (cached.isNotEmpty) {
       _albumTracks = cached;
       _notify();
     }
     if (_offlineMode) {
       final filtered = _filterPinnedTracks(_albumTracks);
-      _albumTracks =
-          filtered.isNotEmpty ? filtered : await _offlineTracksForAlbum(album);
+      if (filtered.isNotEmpty) {
+        _albumTracks = filtered;
+      } else {
+        final tracks = await _offlineTracksForAlbum(album);
+        if (_selectedAlbum?.id != album.id) {
+          return;
+        }
+        _albumTracks = tracks;
+      }
       _notify();
       return;
     }
     try {
       final tracks = await _client.fetchAlbumTracks(album.id);
+      if (_selectedAlbum?.id != album.id) {
+        return;
+      }
       _albumTracks = tracks;
-      await _cacheStore.saveAlbumTracks(album.id, tracks);
       _notify();
+      await _cacheStore.saveAlbumTracks(album.id, tracks);
     } catch (_) {
       // Keep cached tracks if refresh fails.
     }
@@ -1435,31 +1468,52 @@ extension AppStateLibraryExtension on AppState {
     if (_selectedView != LibraryView.home) {
       _recordViewHistory(_selectedView);
     }
-    _selectedArtist = artist;
+    final isSameArtist = _selectedArtist?.id == artist.id;
+    _selectedPlaylist = null;
+    _playlistTracks = [];
     _selectedSmartList = null;
+    _smartListTracks = [];
+    _selectedArtist = artist;
     _selectedAlbum = null;
     _selectedGenre = null;
+    _albumTracks = [];
+    if (!isSameArtist) {
+      _artistTracks = [];
+    }
+    _genreTracks = [];
     _offlineOnlyFilter = offlineOnly;
     clearSearch(notify: false);
     _notify();
     final cached = await _cacheStore.loadArtistTracks(artist.id);
+    if (_selectedArtist?.id != artist.id) {
+      return;
+    }
     if (cached.isNotEmpty) {
       _artistTracks = cached;
       _notify();
     }
     if (_offlineMode) {
       final filtered = _filterPinnedTracks(_artistTracks);
-      _artistTracks = filtered.isNotEmpty
-          ? filtered
-          : await _offlineTracksForArtist(artist);
+      if (filtered.isNotEmpty) {
+        _artistTracks = filtered;
+      } else {
+        final tracks = await _offlineTracksForArtist(artist);
+        if (_selectedArtist?.id != artist.id) {
+          return;
+        }
+        _artistTracks = tracks;
+      }
       _notify();
       return;
     }
     try {
       final tracks = await _client.fetchArtistTracks(artist.id);
+      if (_selectedArtist?.id != artist.id) {
+        return;
+      }
       _artistTracks = tracks;
-      await _cacheStore.saveArtistTracks(artist.id, tracks);
       _notify();
+      await _cacheStore.saveArtistTracks(artist.id, tracks);
     } catch (_) {
       // Keep cached tracks if refresh fails.
     }
@@ -1480,13 +1534,25 @@ extension AppStateLibraryExtension on AppState {
     if (_selectedView != LibraryView.home) {
       _recordViewHistory(_selectedView);
     }
-    _selectedGenre = genre;
+    final isSameGenre = _selectedGenre?.id == genre.id;
+    _selectedPlaylist = null;
+    _playlistTracks = [];
     _selectedSmartList = null;
+    _smartListTracks = [];
+    _selectedGenre = genre;
     _selectedAlbum = null;
     _selectedArtist = null;
+    _albumTracks = [];
+    _artistTracks = [];
+    if (!isSameGenre) {
+      _genreTracks = [];
+    }
     clearSearch(notify: false);
     _notify();
     final cached = await _cacheStore.loadGenreTracks(genre.id);
+    if (_selectedGenre?.id != genre.id) {
+      return;
+    }
     if (cached.isNotEmpty) {
       _genreTracks = cached;
       _notify();
@@ -1496,9 +1562,12 @@ extension AppStateLibraryExtension on AppState {
     }
     try {
       final tracks = await _client.fetchGenreTracks(genre.id);
+      if (_selectedGenre?.id != genre.id) {
+        return;
+      }
       _genreTracks = tracks;
-      await _cacheStore.saveGenreTracks(genre.id, tracks);
       _notify();
+      await _cacheStore.saveGenreTracks(genre.id, tracks);
     } catch (_) {
       // Keep cached tracks if refresh fails.
     }

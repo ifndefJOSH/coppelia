@@ -13,6 +13,7 @@ Future<void> showTrackContextMenu({
   required Offset position,
   required MediaItem track,
   required VoidCallback onTap,
+  bool showPlayAction = true,
   VoidCallback? onPlayNext,
   VoidCallback? onAddToQueue,
   Future<String?> Function()? onToggleFavorite,
@@ -28,12 +29,16 @@ Future<void> showTrackContextMenu({
     return;
   }
 
-  final items = <PopupMenuEntry<_TrackMenuAction>>[
-    const PopupMenuItem(
-      value: _TrackMenuAction.play,
-      child: Text('Play'),
-    ),
-  ];
+  final items = <PopupMenuEntry<_TrackMenuAction>>[];
+
+  if (showPlayAction) {
+    items.add(
+      const PopupMenuItem(
+        value: _TrackMenuAction.play,
+        child: Text('Play'),
+      ),
+    );
+  }
 
   if (onPlayNext != null) {
     items.add(

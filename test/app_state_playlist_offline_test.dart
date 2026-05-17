@@ -1,8 +1,11 @@
+import 'dart:async';
+
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:coppelia/models/album.dart';
 import 'package:coppelia/models/media_item.dart';
 import 'package:coppelia/models/playlist.dart';
 import 'package:coppelia/models/cached_audio_entry.dart';
@@ -34,6 +37,16 @@ MediaItem _track(String id) {
     duration: const Duration(minutes: 3),
     imageUrl: null,
     streamUrl: 'https://example.com/audio/$id.mp3',
+  );
+}
+
+Album _album(String id) {
+  return Album(
+    id: id,
+    name: 'Album $id',
+    artistName: 'Artist',
+    trackCount: 1,
+    imageUrl: null,
   );
 }
 
@@ -234,6 +247,113 @@ void main() {
         verify(() => cacheStore.setPinnedAudio(track.streamUrl, false))
             .called(1);
       }
+    });
+  });
+
+  group('AppState detail selection', () {
+    test('selectAlbum clears playlist detail state', () async {
+      final cacheStore = _MockCacheStore();
+      final client = _MockJellyfinClient();
+      final playback = _MockPlaybackController();
+      final sessionStore = _MockSessionStore();
+      final settingsStore = _MockSettingsStore();
+      final state = buildState(
+        cacheStore: cacheStore,
+        client: client,
+        playback: playback,
+        sessionStore: sessionStore,
+        settingsStore: settingsStore,
+      );
+      addTearDown(state.dispose);
+
+      const playlist = Playlist(
+        id: 'playlist-detail',
+        name: 'Playlist',
+        trackCount: 1,
+        imageUrl: null,
+      );
+      final playlistTracks = [_track('playlist-track')];
+      final album = _album('target');
+      final albumTracks = [_track('album-track')];
+
+      when(
+        () => cacheStore.loadPlaylistTracks(playlist.id),
+      ).thenAnswer((_) async => playlistTracks);
+      when(
+        () => client.fetchPlaylistTracks(playlist.id),
+      ).thenAnswer((_) async => playlistTracks);
+      when(
+        () => cacheStore.loadAlbumTracks(album.id),
+      ).thenAnswer((_) async => const <MediaItem>[]);
+      when(
+        () => client.fetchAlbumTracks(album.id),
+      ).thenAnswer((_) async => albumTracks);
+      when(
+        () => cacheStore.saveAlbumTracks(album.id, albumTracks),
+      ).thenAnswer((_) async {});
+
+      await state.selectPlaylist(playlist);
+      expect(state.selectedPlaylist, playlist);
+      expect(state.playlistTracks, playlistTracks);
+
+      await state.selectAlbum(album);
+
+      expect(state.selectedPlaylist, isNull);
+      expect(state.playlistTracks, isEmpty);
+      expect(state.selectedAlbum, album);
+      expect(state.albumTracks, albumTracks);
+    });
+
+    test('late album fetch cannot overwrite newer album selection', () async {
+      final cacheStore = _MockCacheStore();
+      final client = _MockJellyfinClient();
+      final playback = _MockPlaybackController();
+      final sessionStore = _MockSessionStore();
+      final settingsStore = _MockSettingsStore();
+      final state = buildState(
+        cacheStore: cacheStore,
+        client: client,
+        playback: playback,
+        sessionStore: sessionStore,
+        settingsStore: settingsStore,
+      );
+      addTearDown(state.dispose);
+
+      final firstAlbum = _album('first');
+      final secondAlbum = _album('second');
+      final firstTracks = [_track('first-track')];
+      final secondTracks = [_track('second-track')];
+      final firstFetch = Completer<List<MediaItem>>();
+      final secondFetch = Completer<List<MediaItem>>();
+
+      when(
+        () => cacheStore.loadAlbumTracks(firstAlbum.id),
+      ).thenAnswer((_) async => const <MediaItem>[]);
+      when(
+        () => cacheStore.loadAlbumTracks(secondAlbum.id),
+      ).thenAnswer((_) async => const <MediaItem>[]);
+      when(
+        () => client.fetchAlbumTracks(firstAlbum.id),
+      ).thenAnswer((_) => firstFetch.future);
+      when(
+        () => client.fetchAlbumTracks(secondAlbum.id),
+      ).thenAnswer((_) => secondFetch.future);
+      when(
+        () => cacheStore.saveAlbumTracks(secondAlbum.id, secondTracks),
+      ).thenAnswer((_) async {});
+
+      final firstSelection = state.selectAlbum(firstAlbum);
+      await Future<void>.delayed(Duration.zero);
+
+      final secondSelection = state.selectAlbum(secondAlbum);
+      secondFetch.complete(secondTracks);
+      await secondSelection;
+
+      firstFetch.complete(firstTracks);
+      await firstSelection;
+
+      expect(state.selectedAlbum, secondAlbum);
+      expect(state.albumTracks, secondTracks);
     });
   });
 

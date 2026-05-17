@@ -16,6 +16,7 @@ import 'app_snack.dart';
 import 'artwork_fallback.dart';
 import 'artwork_image.dart';
 import 'corner_radius.dart';
+import 'track_context_menu.dart';
 
 /// Right-side panel for playback and queue control.
 class NowPlayingPanel extends StatelessWidget {
@@ -50,6 +51,45 @@ class NowPlayingPanel extends StatelessWidget {
   return (
     previous: index > 0 ? queue[index - 1] : null,
     next: index + 1 < queue.length ? queue[index + 1] : null,
+  );
+}
+
+Future<void> _showNowPlayingTrackMenu(
+  BuildContext context,
+  Offset position,
+  MediaItem track, {
+  bool closeOnNavigate = false,
+}) async {
+  final state = context.read<AppState>();
+  await showTrackContextMenu(
+    context: context,
+    position: position,
+    track: track,
+    showPlayAction: false,
+    onTap: () {},
+    onPlayNext: () => state.playNext(track),
+    onAddToQueue: () => state.enqueueTrack(track),
+    onToggleFavorite: () => state.setTrackFavorite(
+      track,
+      !state.isFavoriteTrack(track.id),
+    ),
+    isFavorite: state.isFavoriteTrack(track.id),
+    onGoToAlbum: track.albumId == null
+        ? null
+        : () {
+            if (closeOnNavigate) {
+              Navigator.of(context).maybePop();
+            }
+            state.selectAlbumById(track.albumId!);
+          },
+    onGoToArtist: track.artistIds.isEmpty
+        ? null
+        : () {
+            if (closeOnNavigate) {
+              Navigator.of(context).maybePop();
+            }
+            state.selectArtistById(track.artistIds.first);
+          },
   );
 }
 
@@ -109,6 +149,10 @@ class _SidePanel extends StatelessWidget {
             enabled: isTouch && track != null,
             onTap:
                 track == null ? null : () => _openExpandedNowPlaying(context),
+            onContextMenu: track == null
+                ? null
+                : (position) =>
+                    _showNowPlayingTrackMenu(context, position, track),
             builder: (item) {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -245,6 +289,10 @@ class _BottomBar extends StatelessWidget {
                     onTap: track == null
                         ? null
                         : () => _openExpandedNowPlaying(context),
+                    onContextMenu: track == null
+                        ? null
+                        : (position) =>
+                            _showNowPlayingTrackMenu(context, position, track),
                     builder: buildMiniRow,
                   ),
                   SizedBox(height: space(10).clamp(6.0, 14.0)),
@@ -313,6 +361,13 @@ class _BottomBar extends StatelessWidget {
                         onTap: track == null
                             ? null
                             : () => _openExpandedNowPlaying(context),
+                        onContextMenu: track == null
+                            ? null
+                            : (position) => _showNowPlayingTrackMenu(
+                                  context,
+                                  position,
+                                  track,
+                                ),
                         builder: (item) {
                           return Row(
                             children: [
@@ -675,6 +730,7 @@ class _SwipeTrackSwitcher extends StatefulWidget {
     required this.onPrevious,
     required this.builder,
     this.onTap,
+    this.onContextMenu,
     this.enabled = true,
   });
 
@@ -685,6 +741,7 @@ class _SwipeTrackSwitcher extends StatefulWidget {
   final VoidCallback onPrevious;
   final Widget Function(MediaItem? track) builder;
   final VoidCallback? onTap;
+  final ValueChanged<Offset>? onContextMenu;
   final bool enabled;
 
   @override
@@ -816,6 +873,12 @@ class _SwipeTrackSwitcherState extends State<_SwipeTrackSwitcher>
         final interactiveChild = GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: widget.onTap,
+          onLongPressStart: widget.onContextMenu == null
+              ? null
+              : (details) => widget.onContextMenu!.call(details.globalPosition),
+          onSecondaryTapDown: widget.onContextMenu == null
+              ? null
+              : (details) => widget.onContextMenu!.call(details.globalPosition),
           onHorizontalDragStart: canDrag
               ? (_) {
                   _controller.stop();
@@ -1101,6 +1164,14 @@ class _NowPlayingExpandedView extends StatelessWidget {
                     onNext: state.nextTrack,
                     onPrevious: state.previousTrack,
                     enabled: isTouch && track != null,
+                    onContextMenu: track == null
+                        ? null
+                        : (position) => _showNowPlayingTrackMenu(
+                              context,
+                              position,
+                              track,
+                              closeOnNavigate: true,
+                            ),
                     builder: (item) {
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.center,
