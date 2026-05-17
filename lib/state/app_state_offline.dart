@@ -756,6 +756,12 @@ extension AppStateOfflineExtension on AppState {
     _favoriteAlbums = await _cacheStore.loadFavoriteAlbums();
     _favoriteArtists = await _cacheStore.loadFavoriteArtists();
     _favoriteTracks = await _cacheStore.loadFavoriteTracks();
+    _libraryTracks = await _cacheStore.loadLibraryTracks();
+    if (_libraryTracks.isNotEmpty) {
+      _tracksOffset = _libraryTracks.length;
+      _hasMoreTracks = false;
+      _libraryTracksFromOfflineSnapshot = false;
+    }
     _recentTracks = await _cacheStore.loadRecentTracks();
     _playHistory = await _cacheStore.loadPlayHistory();
     _libraryStats = await _cacheStore.loadLibraryStats();

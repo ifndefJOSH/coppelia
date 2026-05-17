@@ -36,6 +36,7 @@ class CacheStore {
   static const _favoriteAlbumsKey = 'cached_favorite_albums';
   static const _favoriteArtistsKey = 'cached_favorite_artists';
   static const _favoriteTracksKey = 'cached_favorite_tracks';
+  static const _libraryTracksKey = 'cached_library_tracks';
   static const _recentTracksKey = 'cached_recent_tracks';
   static const _playHistoryKey = 'cached_play_history';
   static const _libraryStatsKey = 'cached_library_stats';
@@ -283,6 +284,26 @@ class CacheStore {
         .toList();
   }
 
+  /// Persists a complete library track snapshot for Smart List evaluation.
+  Future<void> saveLibraryTracks(List<MediaItem> tracks) async {
+    final preferences = await SharedPreferences.getInstance();
+    final payload = tracks.map((track) => track.toJson()).toList();
+    await preferences.setString(_libraryTracksKey, jsonEncode(payload));
+  }
+
+  /// Loads the cached complete library track snapshot.
+  Future<List<MediaItem>> loadLibraryTracks() async {
+    final preferences = await SharedPreferences.getInstance();
+    final raw = preferences.getString(_libraryTracksKey);
+    if (raw == null || raw.isEmpty) {
+      return [];
+    }
+    final decoded = jsonDecode(raw) as List<dynamic>;
+    return decoded
+        .map((entry) => MediaItem.fromJson(entry as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Persists recent tracks for the home shelf.
   Future<void> saveRecentTracks(List<MediaItem> tracks) async {
     final preferences = await SharedPreferences.getInstance();
@@ -465,6 +486,7 @@ class CacheStore {
     await preferences.remove(_favoriteAlbumsKey);
     await preferences.remove(_favoriteArtistsKey);
     await preferences.remove(_favoriteTracksKey);
+    await preferences.remove(_libraryTracksKey);
     await preferences.remove(_recentTracksKey);
     await preferences.remove(_playHistoryKey);
     await preferences.remove(_libraryStatsKey);

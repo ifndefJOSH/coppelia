@@ -5,9 +5,14 @@ import 'package:flutter_cache_manager/flutter_cache_manager.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mocktail/mocktail.dart';
 
+import 'package:coppelia/models/auth_session.dart';
 import 'package:coppelia/models/album.dart';
+import 'package:coppelia/models/artist.dart';
+import 'package:coppelia/models/genre.dart';
+import 'package:coppelia/models/library_stats.dart';
 import 'package:coppelia/models/media_item.dart';
 import 'package:coppelia/models/playlist.dart';
+import 'package:coppelia/models/smart_list.dart';
 import 'package:coppelia/models/cached_audio_entry.dart';
 import 'package:coppelia/models/download_task.dart';
 import 'package:coppelia/models/track_status_icon_state.dart';
@@ -28,10 +33,10 @@ class _MockSessionStore extends Mock implements SessionStore {}
 
 class _MockSettingsStore extends Mock implements SettingsStore {}
 
-MediaItem _track(String id) {
+MediaItem _track(String id, {String? title}) {
   return MediaItem(
     id: id,
-    title: 'Track $id',
+    title: title ?? 'Track $id',
     album: 'Album',
     artists: const ['Artist'],
     duration: const Duration(minutes: 3),
@@ -50,6 +55,26 @@ Album _album(String id) {
   );
 }
 
+SmartList _titleContainsSmartList(String value) {
+  return SmartList(
+    id: 'smart-$value',
+    name: 'Smart $value',
+    scope: SmartListScope.tracks,
+    group: SmartListGroup(
+      mode: SmartListGroupMode.all,
+      children: [
+        SmartListRuleNode(
+          rule: SmartListRule(
+            field: SmartListField.title,
+            operatorType: SmartListOperator.contains,
+            value: value,
+          ),
+        ),
+      ],
+    ),
+  );
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -58,6 +83,18 @@ void main() {
     registerFallbackValue(<String>{});
     registerFallbackValue(<String, String>{});
     registerFallbackValue(<MediaItem>[]);
+    registerFallbackValue(<Album>[]);
+    registerFallbackValue(<Artist>[]);
+    registerFallbackValue(<Genre>[]);
+    registerFallbackValue(<Playlist>[]);
+    registerFallbackValue(
+      const LibraryStats(
+        trackCount: 0,
+        albumCount: 0,
+        artistCount: 0,
+        playlistCount: 0,
+      ),
+    );
   });
 
   AppState buildState({
@@ -113,6 +150,12 @@ void main() {
       () => cacheStore.savePlaylistTracks(any(), any()),
     ).thenAnswer((_) async {});
     when(
+      () => cacheStore.loadLibraryTracks(),
+    ).thenAnswer((_) async => const <MediaItem>[]);
+    when(
+      () => cacheStore.saveLibraryTracks(any()),
+    ).thenAnswer((_) async {});
+    when(
       () => cacheStore.downloadAudioWithProgress(
         any(),
         headers: any(named: 'headers'),
@@ -128,6 +171,60 @@ void main() {
       sessionStore: sessionStore,
       settingsStore: settingsStore,
     );
+  }
+
+  void stubSignedInRefresh({
+    required _MockCacheStore cacheStore,
+    required _MockJellyfinClient client,
+    required _MockSessionStore sessionStore,
+  }) {
+    const session = AuthSession(
+      accessToken: 'token',
+      serverUrl: 'https://example.com',
+      userId: 'user',
+      userName: 'User',
+    );
+    when(
+      () => client.authenticate(
+        serverUrl: 'https://example.com',
+        username: 'user',
+        password: 'password',
+      ),
+    ).thenAnswer((_) async => session);
+    when(() => sessionStore.saveSession(session)).thenAnswer((_) async {});
+    when(() => client.fetchPlaylists())
+        .thenAnswer((_) async => const <Playlist>[]);
+    when(() => cacheStore.savePlaylists(any())).thenAnswer((_) async {});
+    when(() => client.fetchLibraryStats()).thenAnswer(
+      (_) async => const LibraryStats(
+        trackCount: 0,
+        albumCount: 0,
+        artistCount: 0,
+        playlistCount: 0,
+      ),
+    );
+    when(() => cacheStore.saveLibraryStats(any())).thenAnswer((_) async {});
+    when(() => client.fetchRecentlyPlayedTracks())
+        .thenAnswer((_) async => const <MediaItem>[]);
+    when(() => client.fetchRecentTracks())
+        .thenAnswer((_) async => const <MediaItem>[]);
+    when(() => cacheStore.saveRecentTracks(any())).thenAnswer((_) async {});
+    when(() => cacheStore.saveFeaturedTracks(any())).thenAnswer((_) async {});
+    when(() => client.fetchAlbums()).thenAnswer((_) async => const <Album>[]);
+    when(() => cacheStore.saveAlbums(any())).thenAnswer((_) async {});
+    when(() => client.fetchArtists()).thenAnswer((_) async => const <Artist>[]);
+    when(() => cacheStore.saveArtists(any())).thenAnswer((_) async {});
+    when(() => client.fetchGenres()).thenAnswer((_) async => const <Genre>[]);
+    when(() => cacheStore.saveGenres(any())).thenAnswer((_) async {});
+    when(() => client.fetchFavoriteAlbums())
+        .thenAnswer((_) async => const <Album>[]);
+    when(() => cacheStore.saveFavoriteAlbums(any())).thenAnswer((_) async {});
+    when(() => client.fetchFavoriteArtists())
+        .thenAnswer((_) async => const <Artist>[]);
+    when(() => cacheStore.saveFavoriteArtists(any())).thenAnswer((_) async {});
+    when(() => client.fetchFavoriteTracks())
+        .thenAnswer((_) async => const <MediaItem>[]);
+    when(() => cacheStore.saveFavoriteTracks(any())).thenAnswer((_) async {});
   }
 
   group('AppState playlist offline', () {
@@ -354,6 +451,91 @@ void main() {
 
       expect(state.selectedAlbum, secondAlbum);
       expect(state.albumTracks, secondTracks);
+    });
+  });
+
+  group('AppState smart lists', () {
+    test('selectSmartList evaluates tracks beyond the first library page',
+        () async {
+      final cacheStore = _MockCacheStore();
+      final client = _MockJellyfinClient();
+      final playback = _MockPlaybackController();
+      final sessionStore = _MockSessionStore();
+      final settingsStore = _MockSettingsStore();
+      final state = buildState(
+        cacheStore: cacheStore,
+        client: client,
+        playback: playback,
+        sessionStore: sessionStore,
+        settingsStore: settingsStore,
+      );
+      addTearDown(state.dispose);
+      stubSignedInRefresh(
+        cacheStore: cacheStore,
+        client: client,
+        sessionStore: sessionStore,
+      );
+
+      final firstPage = List.generate(
+        100,
+        (index) => _track('page-1-$index'),
+      );
+      final match = _track('target', title: 'Needle Track');
+      final secondPage = [match];
+      final smartList = _titleContainsSmartList('Needle');
+
+      when(
+        () => client.fetchLibraryTracks(startIndex: 0, limit: 100),
+      ).thenAnswer((_) async => firstPage);
+      when(
+        () => client.fetchLibraryTracks(startIndex: 100, limit: 100),
+      ).thenAnswer((_) async => secondPage);
+
+      await state.signIn(
+        serverUrl: 'https://example.com',
+        username: 'user',
+        password: 'password',
+      );
+
+      await state.selectSmartList(smartList);
+
+      expect(state.smartListTracks, [match]);
+      final captured = verify(
+        () => cacheStore.saveLibraryTracks(captureAny()),
+      ).captured.single as List<MediaItem>;
+      expect(captured, [...firstPage, ...secondPage]);
+    });
+
+    test('selectSmartList can build from cached library snapshot', () async {
+      final cacheStore = _MockCacheStore();
+      final client = _MockJellyfinClient();
+      final playback = _MockPlaybackController();
+      final sessionStore = _MockSessionStore();
+      final settingsStore = _MockSettingsStore();
+      final state = buildState(
+        cacheStore: cacheStore,
+        client: client,
+        playback: playback,
+        sessionStore: sessionStore,
+        settingsStore: settingsStore,
+      );
+      addTearDown(state.dispose);
+
+      final match = _track('cached-target', title: 'Cached Needle');
+      final smartList = _titleContainsSmartList('Needle');
+      when(
+        () => cacheStore.loadLibraryTracks(),
+      ).thenAnswer((_) async => [match]);
+
+      await state.selectSmartList(smartList);
+
+      expect(state.smartListTracks, [match]);
+      verifyNever(
+        () => client.fetchLibraryTracks(
+          startIndex: any(named: 'startIndex'),
+          limit: any(named: 'limit'),
+        ),
+      );
     });
   });
 

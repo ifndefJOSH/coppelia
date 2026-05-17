@@ -114,11 +114,15 @@ extension AppStateLibraryExtension on AppState {
     if (_selectedView != LibraryView.home) {
       _recordViewHistory(_selectedView);
     }
+    final isSameSmartList = _selectedSmartList?.id == list.id;
     _selectedSmartList = list;
     _selectedView = LibraryView.home;
     _offlineOnlyFilter = false;
     _selectedPlaylist = null;
     _playlistTracks = [];
+    if (!isSameSmartList) {
+      _smartListTracks = [];
+    }
     clearBrowseSelection(notify: false);
     clearSearch(notify: false);
     _notify();
@@ -139,6 +143,9 @@ extension AppStateLibraryExtension on AppState {
     _smartLists = [..._smartLists, list]
       ..sort((a, b) => a.name.toLowerCase().compareTo(b.name.toLowerCase()));
     await _settingsStore.saveSmartLists(_smartLists);
+    if (!_offlineMode) {
+      unawaited(_refreshSmartListSource());
+    }
     _notify();
     return list;
   }
@@ -833,6 +840,9 @@ extension AppStateLibraryExtension on AppState {
       if (tracks.length < AppState._tracksPageSize) {
         _hasMoreTracks = false;
       }
+      if (!_hasMoreTracks) {
+        await _cacheStore.saveLibraryTracks(_libraryTracks);
+      }
     } catch (_) {
       // Ignore load failures; keep whatever tracks we already have.
     } finally {
@@ -1006,10 +1016,18 @@ extension AppStateLibraryExtension on AppState {
     _isLoadingSmartList = true;
     _notify();
 
-    if (_libraryTracks.isEmpty && !_offlineMode) {
-      await loadLibraryTracks();
+    if (!_offlineMode && _libraryTracks.isEmpty && !_isLoadingTracks) {
+      await _loadCachedLibraryTrackSnapshot();
+    }
+    if (_libraryTracks.isNotEmpty) {
+      _smartListTracks = _buildSmartListTracks(list);
+      _notify();
     }
 
+    await _ensureSmartListSourceLoaded();
+    if (_selectedSmartList?.id != list.id) {
+      return;
+    }
     _smartListTracks = _buildSmartListTracks(list);
     _isLoadingSmartList = false;
     _notify();
@@ -1022,9 +1040,57 @@ extension AppStateLibraryExtension on AppState {
       }
       return;
     }
-    while (_hasMoreTracks) {
-      await loadLibraryTracks();
+    if (_isLoadingTracks) {
+      await _tracksLoadCompleter?.future;
+      await _loadRemainingLibraryTracks();
+      return;
     }
+    if (_libraryTracks.isEmpty && await _loadCachedLibraryTrackSnapshot()) {
+      return;
+    }
+    await _loadRemainingLibraryTracks();
+  }
+
+  Future<void> _refreshSmartListSource() async {
+    if (_offlineMode || _session == null) {
+      return;
+    }
+    final previousTracks = List<MediaItem>.from(_libraryTracks);
+    final previousOffset = _tracksOffset;
+    final previousHasMore = _hasMoreTracks;
+    await loadLibraryTracks(reset: true);
+    await _loadRemainingLibraryTracks();
+    if (_libraryTracks.isEmpty && _hasMoreTracks && previousTracks.isNotEmpty) {
+      _libraryTracks = previousTracks;
+      _tracksOffset = previousOffset;
+      _hasMoreTracks = previousHasMore;
+      _notify();
+    }
+    _refreshSelectedSmartList();
+  }
+
+  Future<void> _loadRemainingLibraryTracks() async {
+    while (_hasMoreTracks) {
+      final beforeOffset = _tracksOffset;
+      final beforeHasMore = _hasMoreTracks;
+      await loadLibraryTracks();
+      if (_tracksOffset == beforeOffset && _hasMoreTracks == beforeHasMore) {
+        break;
+      }
+    }
+  }
+
+  Future<bool> _loadCachedLibraryTrackSnapshot() async {
+    final cached = await _cacheStore.loadLibraryTracks();
+    if (cached.isEmpty) {
+      return false;
+    }
+    _libraryTracks = cached;
+    _tracksOffset = cached.length;
+    _hasMoreTracks = false;
+    _libraryTracksFromOfflineSnapshot = false;
+    _notify();
+    return true;
   }
 
   List<MediaItem> _buildSmartListTracks(SmartList list) {
