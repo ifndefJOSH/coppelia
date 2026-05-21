@@ -1,0 +1,22 @@
+display_name: Coppelia
+icon: assets/logo_app_icon.svg
+
+build_arch: x86_64
+
+actions:
+  - name: Run Coppelia
+    label: coppelia
+
+keywords:
+  - Music
+  - Jellyfin
+  - Streaming
+
+generic_name: Music Streaming Client
+
+categories:
+  - Multimedia
+  - Music
+
+startup_notify: true
+
