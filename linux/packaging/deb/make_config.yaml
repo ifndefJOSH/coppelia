@@ -1,0 +1,25 @@
+display_name: Coppelia
+package_name: coppelia
+
+maintainer:
+  name: Jordan Matelsky
+  email: redacted@example.com
+
+priority: optional
+
+section: x11
+
+installed_size: 76900 # Got this size from the size of the extracted tarball on your releases page
+
+icon: assets/logo_app_icon.svg
+
+dependencies:
+  - libgtk-3-dev # I think this is the correct package
+  - mpv
+
+essential: false
+
+generic_name: Music Streaming Client
+
+categories:
+  - Multimedia

@@ -1,0 +1,26 @@
+display_name: Coppelia
+icon: assets/logo_app_icon.svg
+vendor: Jordan Matelsky
+packager: Josh Jeppson
+packagerEmail: redacted@example.com
+license: Apache 2.0
+url: https://github.com/j6k4m8/coppelia
+
+build_arch: x86_64
+
+requires:
+  - mpv
+  - gtk3
+
+keywords:
+  - Music
+  - Jellyfin
+  - Streaming
+
+generic_name: Music Streaming Client
+
+categories:
+  - Multimedia
+
+startup_notify: true
+
