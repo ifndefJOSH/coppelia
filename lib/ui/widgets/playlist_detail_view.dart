@@ -147,6 +147,9 @@ class _PlaylistDetailViewState extends State<PlaylistDetailView> {
                       (state.trackListStyle == TrackListStyle.table ? 2 : 1),
                   padding: EdgeInsets.fromLTRB(leftGutter, 0, rightGutter, 0),
                   buildDefaultDragHandles: false,
+                  // Ignore until the repo standardizes on a Flutter SDK that
+                  // supports the replacement callback on all dev machines.
+                  // ignore: deprecated_member_use
                   onReorder: (oldIndex, newIndex) {
                     final headerCount =
                         state.trackListStyle == TrackListStyle.table ? 2 : 1;

@@ -1,0 +1,25 @@
+display_name: Coppelia
+package_name: coppelia
+
+maintainer:
+  name: Jordan Matelsky
+  email: coppelia@matelsky.com
+
+priority: optional
+
+section: x11
+
+installed_size: 76900
+
+icon: assets/logo_app_icon.svg
+
+dependencies:
+  - libgtk-3-0
+  - mpv
+
+essential: false
+
+generic_name: Music Streaming Client
+
+categories:
+  - Multimedia

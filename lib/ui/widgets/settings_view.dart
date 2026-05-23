@@ -823,6 +823,7 @@ class _LayoutSettings extends StatelessWidget {
           physics: const NeverScrollableScrollPhysics(),
           buildDefaultDragHandles: false,
           itemCount: state.homeSectionOrder.length,
+          // ignore: deprecated_member_use
           onReorder: (oldIndex, newIndex) =>
               state.reorderHomeSections(oldIndex, newIndex),
           itemBuilder: (context, index) {
@@ -1464,6 +1465,7 @@ class _DownloadQueueList extends StatelessWidget {
               child: ReorderableListView.builder(
                 buildDefaultDragHandles: false,
                 itemCount: tasks.length,
+                // ignore: deprecated_member_use
                 onReorder: (oldIndex, newIndex) {
                   SchedulerBinding.instance.addPostFrameCallback((_) {
                     onReorder(oldIndex, newIndex);
