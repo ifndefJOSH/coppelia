@@ -11,7 +11,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link
-    href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;600&display=swap"
+    href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600;700&family=Spline+Sans+Mono:wght@400;600&family=Syne:wght@500;600;700;800&display=swap"
     rel="stylesheet" />
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css"
     integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA=="
@@ -29,6 +29,9 @@
       --mint: #34d399;
       --sun: #f59e0b;
       --sea: #38bdf8;
+      --font-body: "IBM Plex Sans", system-ui, -apple-system, Segoe UI, sans-serif;
+      --font-display: "Syne", system-ui, sans-serif;
+      --font-mono: "Spline Sans Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
     }
 
     * {
@@ -39,7 +42,7 @@
     body {
       margin: 0;
       padding: 0;
-      font-family: "Space Grotesk", system-ui, -apple-system, Segoe UI, sans-serif;
+      font-family: var(--font-body);
       background: radial-gradient(1200px 700px at 15% 10%, rgba(52, 211, 153, 0.25), transparent 60%),
         radial-gradient(900px 600px at 85% 10%, rgba(56, 189, 248, 0.22), transparent 55%),
         linear-gradient(180deg, var(--bg0), var(--bg1));
@@ -93,6 +96,7 @@
       display: flex;
       align-items: center;
       gap: 12px;
+      font-family: var(--font-display);
       font-weight: 600;
       letter-spacing: -0.02em;
     }
@@ -129,9 +133,11 @@
     }
 
     .hero h1 {
+      font-family: var(--font-display);
+      font-weight: 700;
       font-size: clamp(32px, 5vw, 54px);
       line-height: 1.05;
-      letter-spacing: -0.03em;
+      letter-spacing: -0.04em;
       margin: 0;
     }
 
@@ -248,12 +254,15 @@
 
     h2 {
       margin: 0 0 10px;
+      font-family: var(--font-display);
+      font-weight: 700;
       font-size: 28px;
+      letter-spacing: -0.03em;
     }
 
     .section-lead {
       color: var(--text1);
-      max-width: 640px;
+      /* max-width: 640px; */
     }
 
     .screens {
@@ -261,6 +270,7 @@
       display: grid;
       gap: 18px;
       grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      align-items: start;
     }
 
     .screen-card {
@@ -281,6 +291,10 @@
       font-size: 12px;
     }
 
+    .screen-card--desktop {
+      grid-column: span 2;
+    }
+
     .feature-grid {
       margin-top: 20px;
       display: grid;
@@ -297,6 +311,8 @@
 
     .feature h3 {
       margin: 0 0 8px;
+      font-family: var(--font-display);
+      font-weight: 600;
     }
 
     .feature p {
@@ -307,7 +323,7 @@
     }
 
     .mono {
-      font-family: "Spline Sans Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-family: var(--font-mono);
       font-size: 12px;
       color: var(--text2);
     }
@@ -348,6 +364,35 @@
       margin: 0;
       color: var(--text1);
       font-size: 14px;
+    }
+
+    .download-card h3 {
+      margin: 0;
+      font-family: var(--font-display);
+      font-size: 22px;
+      letter-spacing: -0.03em;
+    }
+
+    .download-options {
+      display: grid;
+      gap: 10px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .download-options .btn {
+      justify-content: center;
+      padding: 12px 14px;
+      border-radius: 14px;
+      font-size: 14px;
+    }
+
+    .download-card--linux {
+      grid-column: span 2;
+    }
+
+    .download-card--linux .btn-primary {
+      width: auto;
+      color: #0b0f14;
     }
 
     .footer {
@@ -402,6 +447,18 @@
         align-items: flex-start;
         gap: 14px;
       }
+
+      .screen-card--desktop {
+        grid-column: span 1;
+      }
+
+      .download-card--linux {
+        grid-column: span 1;
+      }
+
+      .download-options {
+        grid-template-columns: 1fr;
+      }
     }
 
     @media (prefers-reduced-motion: reduce) {
@@ -443,7 +500,7 @@
           <span class="pill">Flutter</span>
         </div>
         <h1 class="float-in float-delay-1">
-          A Jellyfin music client that feels native, not like a browser tab.
+          A beautiful music client for your Jellyfin library, on <b>desktop</b> & <b>mobile</b>.
         </h1>
         <p class="float-in float-delay-2">
           Coppelia is a fast, low-resource app for your Jellyfin library. Built with Flutter for
@@ -473,9 +530,9 @@
         </div>
       </div>
       <div class="panel preview float-in float-delay-2">
-        <div class="mono label">Desktop preview</div>
+        <div class="mono label">Desktop</div>
         <img src="images/Screenshot-Homepage.jpg" alt="Coppelia desktop home" loading="lazy" />
-        <div class="mono label">Theme variations included</div>
+        <div class="mono label">Themes</div>
         <img src="images/Screenshot-Settings.jpg" alt="Coppelia settings and themes" loading="lazy" />
       </div>
     </section>
@@ -488,11 +545,11 @@
         more theme variations.
       </p>
       <div class="screens">
-        <div class="screen-card">
+        <div class="screen-card screen-card--desktop">
           <img src="images/Screenshot-Artist.jpg" alt="Artist view" loading="lazy" />
           <p>Artist view</p>
         </div>
-        <div class="screen-card">
+        <div class="screen-card screen-card--desktop">
           <img src="images/Screenshot-Queue.jpg" alt="Queue and playback" loading="lazy" />
           <p>Queue and playback controls</p>
         </div>
@@ -511,8 +568,7 @@
       <div class="mono label">Features</div>
       <h2>What it does</h2>
       <p class="section-lead">
-        Built for browsing large libraries without a heavy UI. It stays quick, responsive, and
-        offline when you need it.
+        Built for browsing large libraries without a heavy UI. It stays quick, responsive, and offline when you need it.
       </p>
       <div class="feature-grid">
         <div class="feature">
@@ -521,7 +577,7 @@
         </div>
         <div class="feature">
           <h3>Smart lists</h3>
-          <p>Self-updating playlists built from your listening rules and Jellyfin metadata.</p>
+          <p>Self-updating playlists built from your listening rules.</p>
         </div>
         <div class="feature">
           <h3>Offline pinning</h3>
@@ -531,6 +587,15 @@
           <h3>Playback controls</h3>
           <p>Queue management, repeat, shuffle, and per-device playback settings.</p>
         </div>
+        <div class="feature">
+          <h3>Ultra-configurable</h3>
+          <p>Customize your home screen with layout options; change the theme based on your mood or the current album
+            art.</p>
+        </div>
+        <div class="feature">
+          <h3>Optional auto-downloads</h3>
+          <p>Automatically download your favorite albums and playlists for offline listening.</p>
+        </div>
       </div>
     </section>
 
@@ -538,10 +603,11 @@
       <div class="mono label">Download</div>
       <h2>Get the app</h2>
       <p class="section-lead">
-        Direct download links for the latest release, or browse all builds on GitHub Releases.
+        Direct download links for the latest release, with package options for Linux instead of one generic archive.
       </p>
       <div class="download-grid">
         <div class="download-card">
+          <h3><i class="fa-brands fa-apple"></i> macOS</h3>
           <a class="btn btn-primary"
             href="https://github.com/j6k4m8/coppelia/releases/latest/download/Coppelia-macos.zip" target="_blank"
             rel="noreferrer"><i class="fa-brands fa-apple"></i> Download for macOS</a>
@@ -549,13 +615,28 @@
           <p><strong>Note:</strong> App is not notarized yet. You may need to allow it in Privacy and Security.</p>
           <p class="mono">xattr -d com.apple.quarantine /path/to/Coppelia.app</p>
         </div>
-        <div class="download-card">
-          <a class="btn btn-primary"
-            href="https://github.com/j6k4m8/coppelia/releases/latest/download/Coppelia-linux.tar.gz" target="_blank"
-            rel="noreferrer"><i class="fa-brands fa-linux"></i> Download for Linux</a>
-          <p>Extract and run the binary from the archive.</p>
+        <div class="download-card download-card--linux">
+          <h3><i class="fa-brands fa-linux"></i> Linux packages</h3>
+          <div class="download-options">
+            <a class="btn btn-primary"
+              href="https://github.com/j6k4m8/coppelia/releases/download/v0.0.15/coppelia-0.0.15%2B15-linux.AppImage"
+              target="_blank" rel="noreferrer">AppImage</a>
+            <a class="btn btn-ghost"
+              href="https://github.com/j6k4m8/coppelia/releases/download/v0.0.15/coppelia-0.0.15%2B15-linux.deb"
+              target="_blank" rel="noreferrer">.deb</a>
+            <a class="btn btn-ghost"
+              href="https://github.com/j6k4m8/coppelia/releases/download/v0.0.15/coppelia-0.0.15%2B15-linux.rpm"
+              target="_blank" rel="noreferrer">.rpm</a>
+            <a class="btn btn-ghost"
+              href="https://github.com/j6k4m8/coppelia/releases/download/v0.0.15/Coppelia-linux.tar.gz" target="_blank"
+              rel="noreferrer">tar.gz</a>
+          </div>
+          <p>Pick the package that matches your distro. AppImage is the simplest cross-distro option.</p>
+          <p class="mono">AppImage for quick runs, .deb for Debian/Ubuntu, .rpm for Fedora/RHEL, tar.gz for manual
+            extraction.</p>
         </div>
         <div class="download-card">
+          <h3><i class="fa-brands fa-android"></i> Android</h3>
           <a class="btn btn-primary"
             href="https://github.com/j6k4m8/coppelia/releases/latest/download/Coppelia-android.apk" target="_blank"
             rel="noreferrer"><i class="fa-brands fa-android"></i> Download for Android</a>
@@ -634,14 +715,14 @@
 
       const links = {
         macos: 'https://github.com/j6k4m8/coppelia/releases/latest/download/Coppelia-macos.zip',
-        linux: 'https://github.com/j6k4m8/coppelia/releases/latest/download/Coppelia-linux.tar.gz',
+        linux: 'https://github.com/j6k4m8/coppelia/releases/download/v0.0.15/coppelia-0.0.15%2B15-linux.AppImage',
         android: 'https://github.com/j6k4m8/coppelia/releases/latest/download/Coppelia-android.apk',
         ios: '#download' // Scroll to iOS explanation
       };
 
       const labels = {
         macos: 'Download for macOS',
-        linux: 'Download for Linux',
+        linux: 'Download AppImage',
         android: 'Download for Android',
         ios: 'About iOS'
       };
