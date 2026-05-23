@@ -1,11 +1,13 @@
 display_name: Coppelia
 icon: assets/logo_app_icon.svg
+metainfo: linux/packaging/com.matelsky.coppelia.metainfo.xml
 
 build_arch: x86_64
 
 actions:
   - name: Run Coppelia
     label: coppelia
+    arguments: []
 
 keywords:
   - Music
@@ -19,4 +21,3 @@ categories:
   - Music
 
 startup_notify: true
-
