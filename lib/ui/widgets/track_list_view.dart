@@ -142,6 +142,7 @@ class _TrackListViewState extends State<TrackListView> {
                 padding: listPadding,
                 buildDefaultDragHandles: false,
                 itemCount: widget.tracks.length,
+                // ignore: deprecated_member_use
                 onReorder: widget.onReorder ?? (_, __) {},
                 itemBuilder: (context, index) {
                   Widget? handle;
