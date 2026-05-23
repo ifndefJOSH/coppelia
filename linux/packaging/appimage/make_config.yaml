@@ -17,7 +17,7 @@ keywords:
 generic_name: Music Streaming Client
 
 categories:
-  - Multimedia
+  - AudioVideo
   - Music
 
 startup_notify: true

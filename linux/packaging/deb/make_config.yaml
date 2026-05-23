@@ -22,4 +22,5 @@ essential: false
 generic_name: Music Streaming Client
 
 categories:
-  - Multimedia
+  - AudioVideo
+  - Music
