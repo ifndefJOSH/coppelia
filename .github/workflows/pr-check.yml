@@ -6,6 +6,9 @@ on:
             - main
     workflow_dispatch:
 
+env:
+    FLUTTER_VERSION: '3.44.0'
+
 permissions:
     contents: read
 
@@ -19,7 +22,7 @@ jobs:
             - name: Set up Flutter
               uses: subosito/flutter-action@v2
               with:
-                  flutter-version: '3.44.0'
+                  flutter-version: ${{ env.FLUTTER_VERSION }}
                   cache: true
 
             - name: Install dependencies
@@ -42,7 +45,7 @@ jobs:
             - name: Set up Flutter
               uses: subosito/flutter-action@v2
               with:
-                  flutter-version: '3.44.0'
+                  flutter-version: ${{ env.FLUTTER_VERSION }}
                   cache: true
 
             - name: Install dependencies
