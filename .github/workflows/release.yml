@@ -131,12 +131,15 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y \
+            appstream \
             clang \
             cmake \
+            desktop-file-utils \
             ninja-build \
             pkg-config \
             libgtk-3-dev \
-            liblzma-dev
+            liblzma-dev \
+            rpm
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -147,6 +150,11 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
+      - name: Install Fastforge
+        run: |
+          dart pub global activate fastforge
+          echo "$HOME/.pub-cache/bin" >> "$GITHUB_PATH"
+
       - name: Build Linux bundle
         run: flutter build linux --release
 
@@ -154,14 +162,22 @@ jobs:
         run: |
           tar -czf Coppelia-linux.tar.gz -C build/linux/x64/release/bundle .
 
+      - name: Build Linux packages
+        run: fastforge release --name dev
+
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: Coppelia-linux
-          path: Coppelia-linux.tar.gz
+          if-no-files-found: error
+          path: |
+            Coppelia-linux.tar.gz
+            dist/**
 
       - name: Create GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: Coppelia-linux.tar.gz
+          files: |
+            Coppelia-linux.tar.gz
+            dist/**

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
-  <id>com.matelsky.jordan.blog.coppelia</id>
+  <id>com.matelsky.coppelia</id>
 
   <name>Coppelia</name>
   <summary>Music streaming client for Jellyfin</summary>

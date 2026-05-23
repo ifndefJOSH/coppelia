@@ -1,8 +1,8 @@
 display_name: Coppelia
 icon: assets/logo_app_icon.svg
 vendor: Jordan Matelsky
-packager: Josh Jeppson
-packagerEmail: redacted@example.com
+packager: Jordan Matelsky
+packagerEmail: coppelia@matelsky.com
 license: Apache 2.0
 url: https://github.com/j6k4m8/coppelia
 
@@ -23,4 +23,3 @@ categories:
   - Multimedia
 
 startup_notify: true
-
