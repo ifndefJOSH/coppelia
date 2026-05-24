@@ -14,13 +14,17 @@
 
 ---
 
+> [!IMPORTANT] > **I'm looking for users who are interested in testing the app for Android so I can list it on the Play Store. If you're interested, please reach out to coppelia-android-test@matelsky.com :)**
+
+---
+
 Coppelia is a cross-platform app designed for Jellyfin music libraries. I built it because I couldn't find an app that was:
 
 -   native / low-resource
 -   beautiful
 -   open source
 
-If you hold in your heart other bulletpoints than these, please share and help make Coppelia better!
+If you desire other bulletpoints than these, please share and help make Coppelia better!
 
 ## Screenshots
 
@@ -100,13 +104,17 @@ You will need to sideload the app using Xcode or a tool like AltStore for now...
 > Please note that some Linux-specific quirks may occur, as I do not currently have access to a physical machine for testing.
 
 Using **yay**:
+
 ```bash
 yay -S coppelia-bin
 ```
+
 Using **paru**
+
 ```
 paru -S coppelia-bin
 ```
+
 Other Distributions
 
 You can download Coppelia directly from the official Releases page.
