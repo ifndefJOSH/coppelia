@@ -1,0 +1,171 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Coppelia Privacy</title>
+  <meta name="description" content="Privacy information for Coppelia." />
+  <style>
+    :root {
+      --bg0: #0a0c0f;
+      --bg1: #0d1318;
+      --card: rgba(255, 255, 255, 0.06);
+      --border: rgba(255, 255, 255, 0.12);
+      --text0: rgba(255, 255, 255, 0.92);
+      --text1: rgba(255, 255, 255, 0.72);
+      --mint: #34d399;
+      --sun: #f59e0b;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html,
+    body {
+      margin: 0;
+      padding: 0;
+      min-height: 100%;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(900px 500px at 15% 10%, rgba(52, 211, 153, 0.18), transparent 60%),
+        radial-gradient(700px 420px at 85% 10%, rgba(245, 158, 11, 0.14), transparent 55%),
+        linear-gradient(180deg, var(--bg0), var(--bg1));
+      color: var(--text0);
+    }
+
+    a {
+      color: inherit;
+      /* text-decoration: none; */
+    }
+
+    .container {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 28px 24px 72px;
+    }
+
+    .nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 48px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+    }
+
+    .logo img {
+      width: 36px;
+      height: 36px;
+    }
+
+    .back-link {
+      color: var(--text1);
+      font-size: 14px;
+    }
+
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      background: var(--card);
+      backdrop-filter: blur(12px);
+      padding: 28px;
+    }
+
+    .eyebrow {
+      text-transform: uppercase;
+      letter-spacing: 0.18em;
+      font-size: 12px;
+      color: var(--text1);
+      margin-bottom: 14px;
+    }
+
+    h1 {
+      margin: 0 0 16px;
+      font-size: clamp(32px, 5vw, 48px);
+      line-height: 1.02;
+      letter-spacing: -0.03em;
+    }
+
+    p {
+      margin: 0 0 16px;
+      color: var(--text1);
+      font-size: 17px;
+      line-height: 1.7;
+    }
+
+    strong {
+      color: #fff;
+    }
+
+    .note {
+      margin-top: 22px;
+      padding: 16px 18px;
+      border-radius: 16px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.03);
+    }
+
+    .note a {
+      color: var(--mint);
+      font-weight: 600;
+    }
+  </style>
+</head>
+
+<body>
+  <main class="container">
+    <nav class="nav">
+      <a class="logo" href="../">
+        <img src="../assets/logo.svg" alt="Coppelia logo" />
+        <span>Coppelia</span>
+      </a>
+      <a class="back-link" href="../">Back to site</a>
+    </nav>
+
+    <section class="card">
+      <div class="eyebrow">TLDR: We don't collect any data.</div>
+      <h1>Privacy Policy</h1>
+      <p>
+        Coppelia talks to <strong>your</strong> Jellyfin server so it can show your library and play your music.
+        There is no Coppelia cloud, no analytics dashboard, and no ad-tech <i>anywhere</i>.
+      </p>
+      <h2>What your device stores</h2>
+      <p>
+        Your device stores copies of your Jellyfin library data (like artists, albums, playlists) and cached album art
+        so it can show them to you quickly. This data is stored locally on your device and is never shared with anyone
+        else. You can clear this data at any time from the app settings.
+      </p>
+      <h2>What your device transmits</h2>
+      <p>
+        When you use Coppelia, your device transmits data to your Jellyfin server to fetch your library information and
+        stream your music. This data includes things like your username (if you have
+        one set up on your Jellyfin server), the names of artists/albums/playlists you view, and playback information
+        (like what songs you play and when). This data is only transmitted between your device and your Jellyfin server,
+        and is never shared with anyone else.
+      </p>
+      <p>If you do not want to transmit playback information to your Jellyfin server, you can disable this feature in
+        the app settings. Note that this can break functionality like scrobbling.</p>
+      <h2>Third-party services</h2>
+      <p>
+        Coppelia does not use any third-party services for analytics, advertising, or data-collection.
+        The only code we use that wasn't written by Coppelia developers is a variety of open-source libraries which also
+        don't collect any data.
+      </p>
+      <p>
+        Coppelia is open-source software, which means that anyone can inspect the code to verify that it doesn't do
+        anything sketchy.
+        The source code lives at <a href="https://github.com/j6k4m8/coppelia">Coppelia on GitHub</a>.
+      </p>
+    </section>
+  </main>
+</body>
+
+</html>
