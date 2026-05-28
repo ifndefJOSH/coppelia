@@ -90,7 +90,7 @@ xattr -d com.apple.quarantine /path/to/Coppelia.app
 
 You may need to enable installation from unknown sources in your device settings.
 
-F-Droid listing coming soon!
+F-Droid submission is in progress.
 
 ### iOS
 

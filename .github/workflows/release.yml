@@ -106,23 +106,59 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Build Android APK
-        run: flutter build apk --release
+      - name: Set up Android signing
+        env:
+          ANDROID_UPLOAD_KEYSTORE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+        run: |
+          test -n "$ANDROID_UPLOAD_KEYSTORE"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          printf '%s' "$ANDROID_UPLOAD_KEYSTORE" | base64 --decode > android/upload-keystore.jks
+          cat > android/key.properties <<EOF
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyPassword=$ANDROID_KEY_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          storeFile=upload-keystore.jks
+          EOF
 
-      - name: Package APK
-        run: cp build/app/outputs/flutter-apk/app-release.apk Coppelia-android.apk
+      - name: Build Android bundle
+        run: flutter build appbundle --release
+
+      - name: Build Android APKs
+        run: flutter build apk --release --split-per-abi
+
+      - name: Package Android bundle
+        run: cp build/app/outputs/bundle/release/app-release.aab Coppelia-android.aab
+
+      - name: Package APKs
+        run: |
+          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk Coppelia-android-armeabi-v7a.apk
+          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk Coppelia-android-arm64-v8a.apk
+          cp build/app/outputs/flutter-apk/app-x86_64-release.apk Coppelia-android-x86_64.apk
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: Coppelia-android
-          path: Coppelia-android.apk
+          path: |
+            Coppelia-android.aab
+            Coppelia-android-armeabi-v7a.apk
+            Coppelia-android-arm64-v8a.apk
+            Coppelia-android-x86_64.apk
 
       - name: Create GitHub release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
-          files: Coppelia-android.apk
+          files: |
+            Coppelia-android.aab
+            Coppelia-android-armeabi-v7a.apk
+            Coppelia-android-arm64-v8a.apk
+            Coppelia-android-x86_64.apk
 
   build-linux:
     runs-on: ubuntu-latest
