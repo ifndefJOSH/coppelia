@@ -55,6 +55,49 @@ void main() {
     expect(restored, hasLength(1));
     expect(restored.first.title, 'Evergreen');
   });
+
+  test('cache store saves whole-library offline pins', () async {
+    SharedPreferences.setMockInitialValues({});
+    final cacheStore = CacheStore();
+
+    await cacheStore.saveWholeLibraryPinnedAudio({
+      'https://demo.jellyfin.org/Audio/track-1/stream',
+      'https://demo.jellyfin.org/Audio/track-2/stream',
+    });
+
+    final restored = await cacheStore.loadWholeLibraryPinnedAudio();
+
+    expect(
+      restored,
+      containsAll([
+        'https://demo.jellyfin.org/Audio/track-1/stream',
+        'https://demo.jellyfin.org/Audio/track-2/stream',
+      ]),
+    );
+  });
+
+  test('cache store saves and forgets pinned audio metadata in bulk', () async {
+    SharedPreferences.setMockInitialValues({});
+    final cacheStore = CacheStore();
+    const track = MediaItem(
+      id: 'track-9',
+      title: 'Northbound',
+      album: 'Transit',
+      artists: ['Demo Artist'],
+      duration: Duration(minutes: 4),
+      imageUrl: null,
+      streamUrl: 'https://demo.jellyfin.org/Audio/track-9/stream',
+    );
+
+    await cacheStore.savePinnedAudioItems([track]);
+    await cacheStore.savePinnedAudio({track.streamUrl});
+    var restored = await cacheStore.loadPinnedAudioItems();
+    expect(restored.map((item) => item.streamUrl), contains(track.streamUrl));
+
+    await cacheStore.forgetPinnedAudioItems([track.streamUrl]);
+    restored = await cacheStore.loadPinnedAudioItems();
+    expect(restored, isEmpty);
+  });
 }
 
 class _FakePathProvider extends PathProviderPlatform {

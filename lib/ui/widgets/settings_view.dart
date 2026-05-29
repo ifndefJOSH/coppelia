@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io' show Platform, Process;
 
@@ -10,6 +11,7 @@ import 'package:url_launcher/url_launcher_string.dart';
 
 import '../../core/formatters.dart';
 import '../../models/download_task.dart';
+import '../../models/whole_library_offline.dart';
 import '../../state/app_state.dart';
 import '../../state/accent_color_source.dart';
 import '../../state/home_section.dart';
@@ -140,8 +142,8 @@ class _SettingsTabBar extends StatelessWidget {
         isScrollable: true,
         tabAlignment: TabAlignment.start,
         padding: EdgeInsets.zero,
-        labelPadding:
-            EdgeInsets.symmetric(horizontal: space(compact ? 2 : 6).clamp(1.0, 8.0)),
+        labelPadding: EdgeInsets.symmetric(
+            horizontal: space(compact ? 2 : 6).clamp(1.0, 8.0)),
         labelColor: Theme.of(context).colorScheme.onSurface,
         unselectedLabelColor: ColorTokens.textSecondary(context),
         dividerColor: Colors.transparent,
@@ -180,9 +182,8 @@ class _SettingsTabLabel extends StatelessWidget {
           horizontal: compact
               ? space(12).clamp(8.0, 14.0)
               : space(18).clamp(12.0, 22.0),
-          vertical: compact
-              ? space(2).clamp(1.0, 4.0)
-              : space(6).clamp(4.0, 10.0),
+          vertical:
+              compact ? space(2).clamp(1.0, 4.0) : space(6).clamp(4.0, 10.0),
         ),
         child: Text(text),
       ),
@@ -1039,15 +1040,28 @@ class _CacheSettingsState extends State<_CacheSettings> {
     100 * 1024 * 1024 * 1024,
     0,
   ];
+  int? _wholeLibraryPinnedTrackCount;
+  bool _isApplyingWholeLibraryAction = false;
 
   @override
   void initState() {
     super.initState();
     widget.state.refreshMediaCacheBytes();
+    unawaited(_refreshWholeLibraryStatus());
   }
 
   void _refreshCacheUsage() {
     widget.state.refreshMediaCacheBytes();
+  }
+
+  Future<void> _refreshWholeLibraryStatus() async {
+    final count = await widget.state.getWholeLibraryOfflineTrackCount();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _wholeLibraryPinnedTrackCount = count;
+    });
   }
 
   Future<bool> _confirmCacheTrim({
@@ -1095,10 +1109,155 @@ class _CacheSettingsState extends State<_CacheSettings> {
     return 'Show in folder';
   }
 
+  String _formatCacheLimit(int bytes) {
+    return bytes <= 0 ? 'Unlimited' : formatBytes(bytes);
+  }
+
+  String _wholeLibrarySubtitle() {
+    final session = widget.state.session;
+    if (session == null) {
+      return 'Sign in to download your library for offline playback.';
+    }
+    if (widget.state.offlineMode) {
+      return 'Turn off Offline Mode to queue new downloads.';
+    }
+    final trackedCount = _wholeLibraryPinnedTrackCount;
+    if (trackedCount == null) {
+      return 'Preparing whole-library offline status...';
+    }
+    if (trackedCount <= 0) {
+      return 'Pin every track in your library for offline playback.';
+    }
+    return '${formatCount(trackedCount)} tracks from a previous whole-library '
+        'download are still pinned for offline playback.';
+  }
+
+  Future<void> _promptWholeLibraryDownload() async {
+    final previewFuture = Future<WholeLibraryOfflinePreview?>.delayed(
+      Duration.zero,
+      () => widget.state.prepareWholeLibraryOfflinePreview(),
+    );
+    final decision = await showDialog<_WholeLibraryDownloadDecision>(
+      context: context,
+      builder: (context) => _WholeLibraryDownloadDialog(
+        previewFuture: previewFuture,
+        formatCacheLimit: _formatCacheLimit,
+      ),
+    );
+    if (decision == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isApplyingWholeLibraryAction = true;
+    });
+    try {
+      final expandedCacheToUnlimited =
+          decision.expandCacheToUnlimited && decision.preview.cacheMaxBytes > 0;
+      if (expandedCacheToUnlimited) {
+        await widget.state.setCacheMaxBytes(0);
+      }
+      final result = await widget.state.makeWholeLibraryAvailableOffline(
+        decision.preview.tracks,
+      );
+      _refreshCacheUsage();
+      await _refreshWholeLibraryStatus();
+      if (!mounted) {
+        return;
+      }
+      if (result.newlyQueuedCount > 0 || result.retriedFailedCount > 0) {
+        final queuedCount = result.newlyQueuedCount + result.retriedFailedCount;
+        widget.onSnack(
+          'Queued ${formatCount(queuedCount)} tracks from your library.'
+          '${expandedCacheToUnlimited ? ' Cache limit set to Unlimited.' : ''}',
+        );
+        return;
+      }
+      if (result.newlyPinnedCount > 0) {
+        widget.onSnack(
+          'Pinned ${formatCount(result.newlyPinnedCount)} library tracks for '
+          'offline playback.'
+          '${expandedCacheToUnlimited ? ' Cache limit set to Unlimited.' : ''}',
+        );
+        return;
+      }
+      widget.onSnack(
+          'Your whole library is already pinned for offline playback.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isApplyingWholeLibraryAction = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _promptWholeLibraryRemoval() async {
+    final trackedCount = _wholeLibraryPinnedTrackCount ?? 0;
+    if (trackedCount <= 0) {
+      return;
+    }
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Stop keeping whole library offline?'),
+        content: Text(
+          'This will remove the offline pin from ${formatCount(trackedCount)} '
+          'tracks added by Download whole library. Downloaded files may remain '
+          'in cache until they are evicted or you clear cached audio.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Stop'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isApplyingWholeLibraryAction = true;
+    });
+    try {
+      final result = await widget.state.removeWholeLibraryOfflineSelection();
+      _refreshCacheUsage();
+      await _refreshWholeLibraryStatus();
+      if (!mounted) {
+        return;
+      }
+      if (result.removedTrackCount > 0) {
+        widget.onSnack(
+          'Stopped keeping ${formatCount(result.removedTrackCount)} tracks '
+          'offline from the whole-library download.',
+        );
+      } else {
+        widget.onSnack('No whole-library offline tracks were queued.');
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isApplyingWholeLibraryAction = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final densityScale = widget.state.layoutDensity.scaleDouble;
     double space(double value) => value * densityScale;
+    final canQueueWholeLibrary = widget.state.session != null &&
+        !widget.state.offlineMode &&
+        !_isApplyingWholeLibraryAction;
+    final canRemoveWholeLibrary = (_wholeLibraryPinnedTrackCount ?? 0) > 0 &&
+        !_isApplyingWholeLibraryAction;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1224,6 +1383,28 @@ class _CacheSettingsState extends State<_CacheSettings> {
         const _SettingsSubheader(title: 'Downloads'),
         SizedBox(height: space(12)),
         _SettingRow(
+          title: 'Whole library',
+          subtitle: _wholeLibrarySubtitle(),
+          trailing: Wrap(
+            spacing: space(8).clamp(6.0, 12.0),
+            runSpacing: space(8).clamp(6.0, 12.0),
+            children: [
+              if ((_wholeLibraryPinnedTrackCount ?? 0) > 0)
+                OutlinedButton(
+                  onPressed:
+                      canRemoveWholeLibrary ? _promptWholeLibraryRemoval : null,
+                  child: const Text('Stop'),
+                ),
+              FilledButton(
+                onPressed:
+                    canQueueWholeLibrary ? _promptWholeLibraryDownload : null,
+                child: const Text('Download whole library'),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(height: space(12)),
+        _SettingRow(
           title: 'Only on Wi-Fi',
           subtitle: 'Avoid cellular downloads for pinned media.',
           forceInline: true,
@@ -1289,6 +1470,226 @@ class _CacheSettingsState extends State<_CacheSettings> {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _WholeLibraryDownloadDecision {
+  const _WholeLibraryDownloadDecision({
+    required this.preview,
+    required this.expandCacheToUnlimited,
+  });
+
+  final WholeLibraryOfflinePreview preview;
+  final bool expandCacheToUnlimited;
+}
+
+class _WholeLibraryDownloadDialog extends StatefulWidget {
+  const _WholeLibraryDownloadDialog({
+    required this.previewFuture,
+    required this.formatCacheLimit,
+  });
+
+  final Future<WholeLibraryOfflinePreview?> previewFuture;
+  final String Function(int bytes) formatCacheLimit;
+
+  @override
+  State<_WholeLibraryDownloadDialog> createState() =>
+      _WholeLibraryDownloadDialogState();
+}
+
+class _WholeLibraryDownloadDialogState
+    extends State<_WholeLibraryDownloadDialog> {
+  bool _expandCacheToUnlimited = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<WholeLibraryOfflinePreview?>(
+      future: widget.previewFuture,
+      builder: (context, snapshot) {
+        final preview = snapshot.data;
+        final canConfirm = snapshot.connectionState == ConnectionState.done &&
+            preview != null &&
+            preview.trackCount > 0;
+        final shouldOfferUnlimitedCache =
+            preview?.shouldOfferUnlimitedCache ?? false;
+        final expandCacheToUnlimited =
+            shouldOfferUnlimitedCache && _expandCacheToUnlimited;
+
+        return AlertDialog(
+          title: const Text('Download whole library?'),
+          content: SingleChildScrollView(
+            child: _buildContent(
+              context,
+              snapshot: snapshot,
+              preview: preview,
+              shouldOfferUnlimitedCache: shouldOfferUnlimitedCache,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: canConfirm
+                  ? () {
+                      Navigator.of(context).pop(
+                        _WholeLibraryDownloadDecision(
+                          preview: preview,
+                          expandCacheToUnlimited: expandCacheToUnlimited,
+                        ),
+                      );
+                    }
+                  : null,
+              child: const Text('Download'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildContent(
+    BuildContext context, {
+    required AsyncSnapshot<WholeLibraryOfflinePreview?> snapshot,
+    required WholeLibraryOfflinePreview? preview,
+    required bool shouldOfferUnlimitedCache,
+  }) {
+    if (snapshot.connectionState != ConnectionState.done) {
+      return Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          const SizedBox(
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(strokeWidth: 2),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              'Preparing your library download...',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (snapshot.hasError) {
+      return Text(
+        'Coppelia could not load your full library right now. Try again in a moment.',
+        style: Theme.of(context).textTheme.bodyMedium,
+      );
+    }
+
+    if (preview == null || preview.trackCount <= 0) {
+      return Text(
+        'No library tracks were available to download.',
+        style: Theme.of(context).textTheme.bodyMedium,
+      );
+    }
+
+    final secondaryStyle = Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: ColorTokens.textSecondary(context),
+        );
+    final content = <Widget>[
+      Text(
+        'This can take a while and use a lot of space. '
+        'You have ${formatCount(preview.trackCount)} songs in your library.',
+      ),
+      const SizedBox(height: 12),
+      Text(
+        'Estimated total download size: about '
+        '${formatBytes(preview.estimatedTotalBytes)}.',
+      ),
+    ];
+
+    if (preview.cachedTrackCount > 0 && preview.estimatedRemainingBytes > 0) {
+      content.add(const SizedBox(height: 8));
+      content.add(
+        Text(
+          '${formatCount(preview.cachedTrackCount)} '
+          '${preview.cachedTrackCount == 1 ? 'track is' : 'tracks are'} '
+          'already downloaded. Remaining to download: about '
+          '${formatBytes(preview.estimatedRemainingBytes)}.',
+        ),
+      );
+    } else if (preview.cachedTrackCount == preview.trackCount) {
+      content.add(const SizedBox(height: 8));
+      content.add(
+        const Text(
+            'Everything in this library snapshot is already downloaded.'),
+      );
+    }
+
+    content.add(const SizedBox(height: 12));
+    content.add(
+      Text(
+        'Your cache limit is ${widget.formatCacheLimit(preview.cacheMaxBytes)} '
+        'right now.',
+      ),
+    );
+    content.add(const SizedBox(height: 8));
+    content.add(
+      Text(
+        'Pinned downloads can exceed that limit; unpinned tracks are evicted first.',
+        style: secondaryStyle,
+      ),
+    );
+
+    if (preview.wholeLibraryPinnedTrackCount > 0) {
+      content.add(const SizedBox(height: 8));
+      content.add(
+        Text(
+          '${formatCount(preview.wholeLibraryPinnedTrackCount)} tracks from an '
+          'earlier whole-library download are already pinned.',
+          style: secondaryStyle,
+        ),
+      );
+    }
+
+    if (preview.downloadsWifiOnly) {
+      content.add(const SizedBox(height: 8));
+      content.add(
+        Text(
+          'Only on Wi-Fi is enabled, so downloads will wait for Wi-Fi.',
+          style: secondaryStyle,
+        ),
+      );
+    }
+
+    if (preview.downloadsPaused) {
+      content.add(const SizedBox(height: 8));
+      content.add(
+        Text(
+          'Downloads are paused right now, so everything will queue but not start yet.',
+          style: secondaryStyle,
+        ),
+      );
+    }
+
+    if (shouldOfferUnlimitedCache) {
+      content.add(const SizedBox(height: 12));
+      content.add(
+        CheckboxListTile(
+          value: _expandCacheToUnlimited,
+          contentPadding: EdgeInsets.zero,
+          controlAffinity: ListTileControlAffinity.leading,
+          onChanged: (value) {
+            setState(() {
+              _expandCacheToUnlimited = value ?? false;
+            });
+          },
+          title: const Text('Set cache limit to Unlimited before starting'),
+        ),
+      );
+    }
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: content,
     );
   }
 }

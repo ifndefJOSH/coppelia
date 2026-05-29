@@ -81,6 +81,7 @@ void main() {
   setUpAll(() {
     registerFallbackValue(_track('fallback'));
     registerFallbackValue(<String>{});
+    registerFallbackValue(<String>[]);
     registerFallbackValue(<String, String>{});
     registerFallbackValue(<MediaItem>[]);
     registerFallbackValue(<Album>[]);
@@ -136,6 +137,21 @@ void main() {
     ).thenAnswer((_) async {});
     when(
       () => cacheStore.savePinnedAudio(any()),
+    ).thenAnswer((_) async {});
+    when(
+      () => cacheStore.savePinnedAudioItems(any()),
+    ).thenAnswer((_) async {});
+    when(
+      () => cacheStore.forgetPinnedAudioItems(any()),
+    ).thenAnswer((_) async {});
+    when(
+      () => cacheStore.loadWholeLibraryPinnedAudio(),
+    ).thenAnswer((_) async => <String>{});
+    when(
+      () => cacheStore.saveWholeLibraryPinnedAudio(any()),
+    ).thenAnswer((_) async {});
+    when(
+      () => cacheStore.setWholeLibraryPinnedAudio(any(), any()),
     ).thenAnswer((_) async {});
     when(
       () => cacheStore.loadPinnedAudioItems(),
@@ -344,6 +360,129 @@ void main() {
         verify(() => cacheStore.setPinnedAudio(track.streamUrl, false))
             .called(1);
       }
+    });
+  });
+
+  group('AppState whole-library offline', () {
+    test(
+        'makeWholeLibraryAvailableOffline only tracks newly added pins in the undo set',
+        () async {
+      final cacheStore = _MockCacheStore();
+      final client = _MockJellyfinClient();
+      final playback = _MockPlaybackController();
+      final sessionStore = _MockSessionStore();
+      final settingsStore = _MockSettingsStore();
+      final state = buildState(
+        cacheStore: cacheStore,
+        client: client,
+        playback: playback,
+        sessionStore: sessionStore,
+        settingsStore: settingsStore,
+      );
+      addTearDown(state.dispose);
+
+      var wholeLibraryPins = <String>{};
+      when(
+        () => cacheStore.loadWholeLibraryPinnedAudio(),
+      ).thenAnswer((_) async => wholeLibraryPins);
+      when(
+        () => cacheStore.saveWholeLibraryPinnedAudio(any()),
+      ).thenAnswer((invocation) async {
+        wholeLibraryPins = Set<String>.from(
+          invocation.positionalArguments.single as Set<String>,
+        );
+      });
+
+      final manualTrack = _track('manual');
+      final wholeLibraryTrack = _track('whole-library');
+      when(
+        () => cacheStore.loadCachedAudioEntries(),
+      ).thenAnswer(
+        (_) async => [
+          CachedAudioEntry(
+            streamUrl: manualTrack.streamUrl,
+            title: manualTrack.title,
+            album: manualTrack.album,
+            artists: manualTrack.artists,
+            cachedAt: DateTime(2024),
+            bytes: 1024,
+            mediaItem: manualTrack,
+          ),
+        ],
+      );
+
+      await state.makeTrackAvailableOffline(manualTrack);
+
+      final result = await state.makeWholeLibraryAvailableOffline([
+        manualTrack,
+        wholeLibraryTrack,
+      ]);
+
+      expect(result.newlyPinnedCount, 1);
+      expect(result.newlyQueuedCount, 1);
+      expect(result.alreadyPinnedCount, 1);
+      expect(wholeLibraryPins, {wholeLibraryTrack.streamUrl});
+      expect(state.pinnedAudio,
+          containsAll([manualTrack.streamUrl, wholeLibraryTrack.streamUrl]));
+    });
+
+    test('removeWholeLibraryOfflineSelection preserves manual pins', () async {
+      final cacheStore = _MockCacheStore();
+      final client = _MockJellyfinClient();
+      final playback = _MockPlaybackController();
+      final sessionStore = _MockSessionStore();
+      final settingsStore = _MockSettingsStore();
+      final state = buildState(
+        cacheStore: cacheStore,
+        client: client,
+        playback: playback,
+        sessionStore: sessionStore,
+        settingsStore: settingsStore,
+      );
+      addTearDown(state.dispose);
+
+      var wholeLibraryPins = <String>{};
+      when(
+        () => cacheStore.loadWholeLibraryPinnedAudio(),
+      ).thenAnswer((_) async => wholeLibraryPins);
+      when(
+        () => cacheStore.saveWholeLibraryPinnedAudio(any()),
+      ).thenAnswer((invocation) async {
+        wholeLibraryPins = Set<String>.from(
+          invocation.positionalArguments.single as Set<String>,
+        );
+      });
+
+      final manualTrack = _track('manual');
+      final wholeLibraryTrack = _track('whole-library');
+      when(
+        () => cacheStore.loadCachedAudioEntries(),
+      ).thenAnswer(
+        (_) async => [
+          CachedAudioEntry(
+            streamUrl: manualTrack.streamUrl,
+            title: manualTrack.title,
+            album: manualTrack.album,
+            artists: manualTrack.artists,
+            cachedAt: DateTime(2024),
+            bytes: 1024,
+            mediaItem: manualTrack,
+          ),
+        ],
+      );
+
+      await state.makeTrackAvailableOffline(manualTrack);
+      await state.makeWholeLibraryAvailableOffline([
+        manualTrack,
+        wholeLibraryTrack,
+      ]);
+
+      final result = await state.removeWholeLibraryOfflineSelection();
+
+      expect(result.removedTrackCount, 1);
+      expect(wholeLibraryPins, isEmpty);
+      expect(state.pinnedAudio, {manualTrack.streamUrl});
+      expect(state.downloadQueue, isEmpty);
     });
   });
 

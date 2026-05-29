@@ -25,6 +25,7 @@ import '../models/playlist.dart';
 import '../models/search_results.dart';
 import '../models/smart_list.dart';
 import '../models/track_status_icon_state.dart';
+import '../models/whole_library_offline.dart';
 import '../services/cache_store.dart';
 import '../services/jellyfin_client.dart';
 import '../services/log_service.dart';

@@ -44,6 +44,7 @@ class CacheStore {
   static const _cachedAudioLimitKey = 'cached_audio_limit_bytes';
   static const _pinnedAudioKey = 'cached_audio_pins';
   static const _pinnedAudioItemsKey = 'cached_audio_pin_items';
+  static const _wholeLibraryPinnedAudioKey = 'cached_audio_whole_library_pins';
   static const _playbackResumeKey = 'cached_playback_resume';
 
   final CacheManager _audioCache = CacheManager(
@@ -855,9 +856,83 @@ class CacheStore {
     return items;
   }
 
+  /// Saves metadata for pinned tracks in one pass.
+  Future<void> savePinnedAudioItems(Iterable<MediaItem> items) async {
+    final normalized = items.toList(growable: false);
+    if (normalized.isEmpty) {
+      return;
+    }
+    final preferences = await SharedPreferences.getInstance();
+    final raw = preferences.getString(_pinnedAudioItemsKey);
+    final Map<String, dynamic> decoded = raw == null || raw.isEmpty
+        ? {}
+        : jsonDecode(raw) as Map<String, dynamic>;
+    for (final item in normalized) {
+      decoded[item.streamUrl] = item.toJson();
+    }
+    await preferences.setString(_pinnedAudioItemsKey, jsonEncode(decoded));
+  }
+
   /// Replaces pinned track URLs after canonicalization or migration.
   Future<void> savePinnedAudio(Set<String> urls) async {
     await _savePinnedAudio(urls);
+  }
+
+  /// Removes pinned track metadata in one pass.
+  Future<void> forgetPinnedAudioItems(Iterable<String> streamUrls) async {
+    final urls = streamUrls.toSet();
+    if (urls.isEmpty) {
+      return;
+    }
+    final preferences = await SharedPreferences.getInstance();
+    final raw = preferences.getString(_pinnedAudioItemsKey);
+    if (raw == null || raw.isEmpty) {
+      return;
+    }
+    final decoded = jsonDecode(raw) as Map<String, dynamic>;
+    for (final streamUrl in urls) {
+      decoded.remove(streamUrl);
+    }
+    await preferences.setString(_pinnedAudioItemsKey, jsonEncode(decoded));
+  }
+
+  Future<Set<String>> _loadWholeLibraryPinnedAudio() async {
+    final preferences = await SharedPreferences.getInstance();
+    final raw = preferences.getString(_wholeLibraryPinnedAudioKey);
+    if (raw == null || raw.isEmpty) {
+      return {};
+    }
+    final decoded = jsonDecode(raw) as List<dynamic>;
+    return decoded.map((entry) => entry.toString()).toSet();
+  }
+
+  Future<void> _saveWholeLibraryPinnedAudio(Set<String> urls) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setString(
+      _wholeLibraryPinnedAudioKey,
+      jsonEncode(urls.toList()),
+    );
+  }
+
+  /// Tracks pins created by the whole-library offline action.
+  Future<void> setWholeLibraryPinnedAudio(String streamUrl, bool pinned) async {
+    final current = await _loadWholeLibraryPinnedAudio();
+    if (pinned) {
+      current.add(streamUrl);
+    } else {
+      current.remove(streamUrl);
+    }
+    await _saveWholeLibraryPinnedAudio(current);
+  }
+
+  /// Loads pins created by the whole-library offline action.
+  Future<Set<String>> loadWholeLibraryPinnedAudio() async {
+    return _loadWholeLibraryPinnedAudio();
+  }
+
+  /// Replaces the set of pins created by the whole-library offline action.
+  Future<void> saveWholeLibraryPinnedAudio(Set<String> urls) async {
+    await _saveWholeLibraryPinnedAudio(urls);
   }
 
   Future<void> _forgetPinnedAudioItem(String streamUrl) async {

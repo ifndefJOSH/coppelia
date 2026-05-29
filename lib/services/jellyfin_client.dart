@@ -1177,7 +1177,7 @@ class JellyfinClient {
       'StartIndex': '$startIndex',
       'Limit': '$limit',
       'Fields': 'RunTimeTicks,Artists,Album,ImageTags,AlbumId,ArtistItems,'
-          'DateCreated,UserData,Genres',
+          'DateCreated,UserData,Genres,MediaStreams,Container',
       'api_key': session.accessToken,
     };
     final uri = Uri.parse(
