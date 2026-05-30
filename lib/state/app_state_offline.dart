@@ -139,6 +139,220 @@ extension AppStateOfflineExtension on AppState {
     _notify();
   }
 
+  /// Returns how many tracks are tracked by the whole-library offline action.
+  Future<int> getWholeLibraryOfflineTrackCount() async {
+    final tracked = await _cacheStore.loadWholeLibraryPinnedAudio();
+    return tracked.length;
+  }
+
+  /// Builds preview data for downloading the whole library offline.
+  Future<WholeLibraryOfflinePreview?>
+      prepareWholeLibraryOfflinePreview() async {
+    if (_session == null || _offlineMode) {
+      return null;
+    }
+    final tracks = await _loadAllLibraryTracksForOfflineAction();
+    if (tracks.isEmpty) {
+      return null;
+    }
+    final cachedEntries = await _cacheStore.loadCachedAudioEntries();
+    final cachedBytesByUrl = <String, int>{
+      for (final entry in cachedEntries) entry.streamUrl: entry.bytes,
+    };
+    final knownBitrates = tracks
+        .map((track) => track.bitrate)
+        .whereType<int>()
+        .where((bitrate) => bitrate > 0)
+        .toList()
+      ..sort();
+    final fallbackBitrate = knownBitrates.isEmpty
+        ? 256000
+        : knownBitrates[knownBitrates.length ~/ 2];
+    var estimatedTotalBytes = 0;
+    var estimatedRemainingBytes = 0;
+    var cachedTrackCount = 0;
+    for (final track in tracks) {
+      final cachedBytes = cachedBytesByUrl[track.streamUrl];
+      if (cachedBytes != null) {
+        estimatedTotalBytes += cachedBytes;
+        cachedTrackCount += 1;
+        continue;
+      }
+      final estimatedBytes = _estimateTrackBytes(track, fallbackBitrate);
+      estimatedTotalBytes += estimatedBytes;
+      estimatedRemainingBytes += estimatedBytes;
+    }
+    final wholeLibraryPinnedTrackCount =
+        (await _cacheStore.loadWholeLibraryPinnedAudio()).length;
+    return WholeLibraryOfflinePreview(
+      tracks: tracks,
+      trackCount: tracks.length,
+      cachedTrackCount: cachedTrackCount,
+      estimatedTotalBytes: estimatedTotalBytes,
+      estimatedRemainingBytes: estimatedRemainingBytes,
+      cacheMaxBytes: _cacheMaxBytes,
+      downloadsWifiOnly: _downloadsWifiOnly,
+      downloadsPaused: _downloadsPaused,
+      wholeLibraryPinnedTrackCount: wholeLibraryPinnedTrackCount,
+    );
+  }
+
+  /// Pins and queues the current library for offline playback in bulk.
+  Future<WholeLibraryOfflineResult> makeWholeLibraryAvailableOffline(
+    List<MediaItem> tracks,
+  ) async {
+    final normalizedTracks = _deduplicateTracksForOffline(tracks);
+    if (normalizedTracks.isEmpty) {
+      return const WholeLibraryOfflineResult(
+        trackCount: 0,
+        newlyPinnedCount: 0,
+        newlyQueuedCount: 0,
+        retriedFailedCount: 0,
+        alreadyPinnedCount: 0,
+        wholeLibraryPinnedTrackCount: 0,
+      );
+    }
+
+    final cachedEntries = await _cacheStore.loadCachedAudioEntries();
+    final cachedUrls = cachedEntries.map((entry) => entry.streamUrl).toSet();
+    _cachedAudio = cachedUrls;
+
+    final nextPinnedAudio = Set<String>.from(_pinnedAudio);
+    final nextWholeLibraryPinnedAudio =
+        Set<String>.from(await _cacheStore.loadWholeLibraryPinnedAudio());
+    final pinnedItemsToSave = <MediaItem>[];
+    final pinnedItemsToForget = <String>{};
+    var newlyPinnedCount = 0;
+    var newlyQueuedCount = 0;
+    var retriedFailedCount = 0;
+    var alreadyPinnedCount = 0;
+
+    for (final track in normalizedTracks) {
+      final keys = _offlineKeysForTrack(track);
+      for (final key in keys) {
+        _cancelledOfflineRequests.remove(key);
+      }
+
+      final wasPinned = keys.any(nextPinnedAudio.contains);
+      if (wasPinned) {
+        alreadyPinnedCount += 1;
+      } else {
+        nextPinnedAudio.add(track.streamUrl);
+        nextWholeLibraryPinnedAudio.add(track.streamUrl);
+        pinnedItemsToSave.add(track);
+        newlyPinnedCount += 1;
+      }
+
+      for (final key in keys.where((key) => key != track.streamUrl)) {
+        if (nextPinnedAudio.remove(key)) {
+          pinnedItemsToForget.add(key);
+        }
+        nextWholeLibraryPinnedAudio.remove(key);
+      }
+
+      if (keys.any(cachedUrls.contains)) {
+        _cachedAudio.addAll(keys);
+        continue;
+      }
+
+      final existingIndex = _indexOfDownloadForKeys(keys);
+      if (existingIndex != null) {
+        final existing = _downloadQueue[existingIndex];
+        if (existing.status == DownloadStatus.failed) {
+          _replaceDownloadTaskAt(
+            existingIndex,
+            existing.copyWith(
+              status: DownloadStatus.queued,
+              progress: null,
+              totalBytes: null,
+              downloadedBytes: null,
+              errorMessage: null,
+            ),
+          );
+          retriedFailedCount += 1;
+        }
+        continue;
+      }
+
+      _addDownloadTask(
+        DownloadTask(
+          track: track,
+          status: DownloadStatus.queued,
+          queuedAt: DateTime.now(),
+        ),
+      );
+      newlyQueuedCount += 1;
+    }
+
+    _pinnedAudio = nextPinnedAudio;
+    await _cacheStore.savePinnedAudio(_pinnedAudio);
+    if (pinnedItemsToSave.isNotEmpty) {
+      await _cacheStore.savePinnedAudioItems(pinnedItemsToSave);
+    }
+    if (pinnedItemsToForget.isNotEmpty) {
+      await _cacheStore.forgetPinnedAudioItems(pinnedItemsToForget);
+    }
+    await _cacheStore.saveWholeLibraryPinnedAudio(nextWholeLibraryPinnedAudio);
+
+    _refreshSelectedSmartList();
+    unawaited(refreshMediaCacheBytes());
+    _notify();
+    if (!_downloadsPaused) {
+      unawaited(_processDownloadQueue());
+    }
+
+    return WholeLibraryOfflineResult(
+      trackCount: normalizedTracks.length,
+      newlyPinnedCount: newlyPinnedCount,
+      newlyQueuedCount: newlyQueuedCount,
+      retriedFailedCount: retriedFailedCount,
+      alreadyPinnedCount: alreadyPinnedCount,
+      wholeLibraryPinnedTrackCount: nextWholeLibraryPinnedAudio.length,
+    );
+  }
+
+  /// Removes the tracked whole-library offline selection.
+  Future<WholeLibraryOfflineRemovalResult>
+      removeWholeLibraryOfflineSelection() async {
+    final wholeLibraryPinnedAudio =
+        await _cacheStore.loadWholeLibraryPinnedAudio();
+    if (wholeLibraryPinnedAudio.isEmpty) {
+      return const WholeLibraryOfflineRemovalResult(removedTrackCount: 0);
+    }
+
+    final keysToRemove = <String>{};
+    for (final streamUrl in wholeLibraryPinnedAudio) {
+      keysToRemove.addAll(_offlineKeysForStreamUrl(streamUrl));
+    }
+
+    _pinnedAudio.removeWhere(keysToRemove.contains);
+    _downloadQueue.removeWhere((task) {
+      if (!keysToRemove.contains(task.track.streamUrl)) {
+        return false;
+      }
+      _downloadStatusByUrl.remove(task.track.streamUrl);
+      _downloadProgressTimestamps.remove(task.track.streamUrl);
+      return true;
+    });
+    _downloadStatusByUrl
+        .removeWhere((streamUrl, _) => keysToRemove.contains(streamUrl));
+    _downloadProgressTimestamps
+        .removeWhere((streamUrl, _) => keysToRemove.contains(streamUrl));
+    _cancelledOfflineRequests.addAll(keysToRemove);
+
+    await _cacheStore.savePinnedAudio(_pinnedAudio);
+    await _cacheStore.forgetPinnedAudioItems(keysToRemove);
+    await _cacheStore.saveWholeLibraryPinnedAudio(<String>{});
+
+    _refreshSelectedSmartList();
+    unawaited(refreshMediaCacheBytes());
+    _notify();
+
+    return WholeLibraryOfflineRemovalResult(
+      removedTrackCount: wholeLibraryPinnedAudio.length,
+    );
+  }
+
   Future<bool> _canDownloadOverNetwork({bool requireWifi = false}) async {
     if (_offlineMode) {
       return false;
@@ -211,6 +425,13 @@ extension AppStateOfflineExtension on AppState {
   int? _indexOfDownload(String streamUrl) {
     final index = _downloadQueue.indexWhere(
       (task) => task.track.streamUrl == streamUrl,
+    );
+    return index == -1 ? null : index;
+  }
+
+  int? _indexOfDownloadForKeys(Set<String> streamUrls) {
+    final index = _downloadQueue.indexWhere(
+      (task) => streamUrls.contains(task.track.streamUrl),
     );
     return index == -1 ? null : index;
   }
@@ -543,9 +764,12 @@ extension AppStateOfflineExtension on AppState {
           _cancelledOfflineRequests.remove(key);
         }
         await _cacheStore.setPinnedAudioItem(normalized, true);
+        await _cacheStore.setWholeLibraryPinnedAudio(
+            normalized.streamUrl, false);
         _pinnedAudio.add(normalized.streamUrl);
         for (final key in keys.where((key) => key != normalized.streamUrl)) {
           await _cacheStore.setPinnedAudio(key, false);
+          await _cacheStore.setWholeLibraryPinnedAudio(key, false);
           _pinnedAudio.remove(key);
         }
         await _queueDownload(normalized, requiresWifi: requiresWifi);
@@ -553,6 +777,7 @@ extension AppStateOfflineExtension on AppState {
         for (final key in keys) {
           _cancelledOfflineRequests.add(key);
           await _cacheStore.setPinnedAudio(key, false);
+          await _cacheStore.setWholeLibraryPinnedAudio(key, false);
           _pinnedAudio.remove(key);
           _removeDownload(key);
         }
@@ -745,6 +970,42 @@ extension AppStateOfflineExtension on AppState {
         .where((entry) => _pinnedAudio.contains(entry.streamUrl))
         .map(_mediaItemFromCachedEntry)
         .toList();
+  }
+
+  Future<List<MediaItem>> _loadAllLibraryTracksForOfflineAction() async {
+    if (_offlineMode) {
+      return loadOfflineTracks();
+    }
+    if (_session == null) {
+      return const <MediaItem>[];
+    }
+    await _refreshSmartListSource();
+    if (_libraryTracks.isEmpty) {
+      await _loadCachedLibraryTrackSnapshot();
+    }
+    return _deduplicateTracksForOffline(_libraryTracks);
+  }
+
+  List<MediaItem> _deduplicateTracksForOffline(Iterable<MediaItem> tracks) {
+    final deduplicated = <String, MediaItem>{};
+    for (final track in tracks) {
+      final normalized = _normalizeTrackForOffline(track);
+      deduplicated.putIfAbsent(normalized.streamUrl, () => normalized);
+    }
+    return deduplicated.values.toList(growable: false);
+  }
+
+  int _estimateTrackBytes(MediaItem track, int fallbackBitrate) {
+    final bitrate = track.bitrate != null && track.bitrate! > 0
+        ? track.bitrate!
+        : fallbackBitrate;
+    if (bitrate <= 0 || track.duration <= Duration.zero) {
+      return 0;
+    }
+    return max(
+      0,
+      (track.duration.inMilliseconds * bitrate) ~/ 8000,
+    );
   }
 
   Future<void> _loadCachedLibrary() async {

@@ -128,17 +128,26 @@ jobs:
       - name: Build Android bundle
         run: flutter build appbundle --release
 
-      - name: Build Android APKs
-        run: flutter build apk --release --split-per-abi
+      - name: Build Android armeabi-v7a APK
+        run: flutter build apk --release --split-per-abi --target-platform=android-arm
+
+      - name: Package Android armeabi-v7a APK
+        run: cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk Coppelia-android-armeabi-v7a.apk
+
+      - name: Build Android arm64-v8a APK
+        run: flutter build apk --release --split-per-abi --target-platform=android-arm64
+
+      - name: Package Android arm64-v8a APK
+        run: cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk Coppelia-android-arm64-v8a.apk
+
+      - name: Build Android x86_64 APK
+        run: flutter build apk --release --split-per-abi --target-platform=android-x64
+
+      - name: Package Android x86_64 APK
+        run: cp build/app/outputs/flutter-apk/app-x86_64-release.apk Coppelia-android-x86_64.apk
 
       - name: Package Android bundle
         run: cp build/app/outputs/bundle/release/app-release.aab Coppelia-android.aab
-
-      - name: Package APKs
-        run: |
-          cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk Coppelia-android-armeabi-v7a.apk
-          cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk Coppelia-android-arm64-v8a.apk
-          cp build/app/outputs/flutter-apk/app-x86_64-release.apk Coppelia-android-x86_64.apk
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
