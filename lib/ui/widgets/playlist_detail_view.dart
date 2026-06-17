@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../core/formatters.dart';
 import '../../models/download_task.dart';
 import '../../models/playlist.dart';
 import '../../models/media_item.dart';
@@ -41,7 +42,8 @@ PlaylistOfflineActionState derivePlaylistOfflineActionState({
   required Set<String> pinnedAudio,
   required List<DownloadTask> downloadQueue,
 }) {
-  final playlistTrackUrls = playlistTracks.map((track) => track.streamUrl).toSet();
+  final playlistTrackUrls =
+      playlistTracks.map((track) => track.streamUrl).toSet();
   final relatedDownloads = downloadQueue
       .where((task) => playlistTrackUrls.contains(task.track.streamUrl))
       .toList();
@@ -174,6 +176,7 @@ class _PlaylistDetailViewState extends State<PlaylistDetailView> {
                         child: _PlaylistHeader(
                           playlist: playlist,
                           tracks: displayTracks,
+                          durationTracks: fullPlaylistTracks,
                           canEdit: canEdit,
                           offlineLabel: offlineState.label,
                           offlineTooltip: offlineState.tooltip,
@@ -268,6 +271,7 @@ class _PlaylistDetailViewState extends State<PlaylistDetailView> {
                       return _PlaylistHeader(
                         playlist: playlist,
                         tracks: displayTracks,
+                        durationTracks: fullPlaylistTracks,
                         canEdit: canEdit,
                         offlineLabel: offlineState.label,
                         offlineTooltip: offlineState.tooltip,
@@ -383,6 +387,7 @@ class _PlaylistHeader extends StatelessWidget {
   const _PlaylistHeader({
     required this.playlist,
     required this.tracks,
+    required this.durationTracks,
     required this.canEdit,
     required this.offlineLabel,
     required this.offlineTooltip,
@@ -395,6 +400,7 @@ class _PlaylistHeader extends StatelessWidget {
 
   final Playlist playlist;
   final List<MediaItem> tracks;
+  final List<MediaItem> durationTracks;
   final bool canEdit;
   final String offlineLabel;
   final String offlineTooltip;
@@ -408,6 +414,14 @@ class _PlaylistHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final state = context.read<AppState>();
     final overflowKey = GlobalKey();
+    final duration = totalTrackDuration(
+      durationTracks,
+      expectedTrackCount: playlist.trackCount,
+    );
+    final subtitle = formatTrackCountWithDuration(
+      playlist.trackCount,
+      duration,
+    );
     final actionSpecs = <HeaderActionSpec>[
       HeaderActionSpec(
         icon: Icons.play_arrow,
@@ -506,7 +520,7 @@ class _PlaylistHeader extends StatelessWidget {
     ];
     return CollectionHeader(
       title: playlist.name,
-      subtitle: '${playlist.trackCount} tracks',
+      subtitle: subtitle,
       imageUrl: playlist.imageUrl,
       fallbackIcon: Icons.queue_music,
       actionSpecs: actionSpecs,

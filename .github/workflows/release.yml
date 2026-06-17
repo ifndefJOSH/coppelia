@@ -87,9 +87,19 @@ jobs:
 
   build-android:
     runs-on: ubuntu-latest
+    env:
+      ANDROID_BUILD_DIR: /home/vagrant/build/com.matelsky.coppelia
+      PUB_CACHE: /home/vagrant/build/com.matelsky.coppelia/.pub-cache
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Mirror checkout to F-Droid build path
+        run: |
+          sudo mkdir -p /home/vagrant/build
+          sudo chown -R "$USER:$USER" /home/vagrant
+          rm -rf "$ANDROID_BUILD_DIR"
+          cp -a "$GITHUB_WORKSPACE" "$ANDROID_BUILD_DIR"
 
       - name: Set up Java
         uses: actions/setup-java@v4
@@ -104,9 +114,11 @@ jobs:
           cache: true
 
       - name: Install dependencies
+        working-directory: ${{ env.ANDROID_BUILD_DIR }}
         run: flutter pub get
 
       - name: Set up Android signing
+        working-directory: ${{ env.ANDROID_BUILD_DIR }}
         env:
           ANDROID_UPLOAD_KEYSTORE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -125,29 +137,49 @@ jobs:
           storeFile=upload-keystore.jks
           EOF
 
-      - name: Build Android bundle
-        run: flutter build appbundle --release
-
       - name: Build Android armeabi-v7a APK
-        run: flutter build apk --release --split-per-abi --target-platform=android-arm
+        working-directory: ${{ env.ANDROID_BUILD_DIR }}
+        run: |
+          flutter clean
+          flutter pub get
+          flutter build apk --release --split-per-abi --target-platform=android-arm
 
       - name: Package Android armeabi-v7a APK
-        run: cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk Coppelia-android-armeabi-v7a.apk
+        working-directory: ${{ env.ANDROID_BUILD_DIR }}
+        run: cp build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk "$GITHUB_WORKSPACE/Coppelia-android-armeabi-v7a.apk"
 
       - name: Build Android arm64-v8a APK
-        run: flutter build apk --release --split-per-abi --target-platform=android-arm64
+        working-directory: ${{ env.ANDROID_BUILD_DIR }}
+        run: |
+          flutter clean
+          flutter pub get
+          flutter build apk --release --split-per-abi --target-platform=android-arm64
 
       - name: Package Android arm64-v8a APK
-        run: cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk Coppelia-android-arm64-v8a.apk
+        working-directory: ${{ env.ANDROID_BUILD_DIR }}
+        run: cp build/app/outputs/flutter-apk/app-arm64-v8a-release.apk "$GITHUB_WORKSPACE/Coppelia-android-arm64-v8a.apk"
 
       - name: Build Android x86_64 APK
-        run: flutter build apk --release --split-per-abi --target-platform=android-x64
+        working-directory: ${{ env.ANDROID_BUILD_DIR }}
+        run: |
+          flutter clean
+          flutter pub get
+          flutter build apk --release --split-per-abi --target-platform=android-x64
 
       - name: Package Android x86_64 APK
-        run: cp build/app/outputs/flutter-apk/app-x86_64-release.apk Coppelia-android-x86_64.apk
+        working-directory: ${{ env.ANDROID_BUILD_DIR }}
+        run: cp build/app/outputs/flutter-apk/app-x86_64-release.apk "$GITHUB_WORKSPACE/Coppelia-android-x86_64.apk"
+
+      - name: Build Android bundle
+        working-directory: ${{ env.ANDROID_BUILD_DIR }}
+        run: |
+          flutter clean
+          flutter pub get
+          flutter build appbundle --release
 
       - name: Package Android bundle
-        run: cp build/app/outputs/bundle/release/app-release.aab Coppelia-android.aab
+        working-directory: ${{ env.ANDROID_BUILD_DIR }}
+        run: cp build/app/outputs/bundle/release/app-release.aab "$GITHUB_WORKSPACE/Coppelia-android.aab"
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
