@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../../core/color_tokens.dart';
+import '../../core/formatters.dart';
 import '../../models/download_task.dart';
 import '../../state/app_state.dart';
 import '../../state/layout_density.dart';
@@ -24,9 +25,17 @@ class AlbumDetailView extends StatelessWidget {
     final artistName = album.artistName;
     final canLinkArtist =
         artistName.isNotEmpty && artistName != 'Unknown Artist';
-    final subtitle = '${album.trackCount} tracks • $artistName';
+    final duration = totalTrackDuration(
+      state.albumTracks,
+      expectedTrackCount: album.trackCount,
+    );
+    final trackSummary = formatTrackCountWithDuration(
+      album.trackCount,
+      duration,
+    );
+    final subtitle = '$trackSummary • $artistName';
     final subtitleWidget = _AlbumSubtitle(
-      trackCount: album.trackCount,
+      trackSummary: trackSummary,
       artistName: artistName,
       onArtistTap:
           canLinkArtist ? () => state.selectArtistByName(artistName) : null,
@@ -172,12 +181,12 @@ class AlbumDetailView extends StatelessWidget {
 
 class _AlbumSubtitle extends StatelessWidget {
   const _AlbumSubtitle({
-    required this.trackCount,
+    required this.trackSummary,
     required this.artistName,
     this.onArtistTap,
   });
 
-  final int trackCount;
+  final String trackSummary;
   final String artistName;
   final VoidCallback? onArtistTap;
 
@@ -196,7 +205,7 @@ class _AlbumSubtitle extends StatelessWidget {
     return Row(
       children: [
         Text(
-          '$trackCount tracks',
+          trackSummary,
           style: baseStyle,
         ),
         SizedBox(width: space(6).clamp(4.0, 10.0)),
