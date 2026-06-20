@@ -47,6 +47,11 @@ android {
         versionName = flutter.versionName
     }
 
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
+
     signingConfigs {
         if (hasReleaseSigning) {
             create("release") {
