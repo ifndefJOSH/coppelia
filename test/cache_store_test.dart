@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
 import 'package:coppelia/models/media_item.dart';
+import 'package:coppelia/models/playback_resume_state.dart';
 import 'package:coppelia/models/playlist.dart';
 import 'package:coppelia/services/cache_store.dart';
 
@@ -56,6 +57,53 @@ void main() {
     expect(restored.first.title, 'Evergreen');
   });
 
+  test('media item cache migration strips legacy api key from stream URL', () {
+    final item = MediaItem.fromJson({
+      'id': 'track-legacy',
+      'title': 'Legacy',
+      'album': 'Old Cache',
+      'artists': ['Studio Band'],
+      'durationMs': 120000,
+      'imageUrl': null,
+      'streamUrl':
+          'https://demo.jellyfin.org/Audio/track-legacy/universal?UserId=user&api_key=secret&DeviceId=device',
+    });
+
+    final uri = Uri.parse(item.streamUrl);
+    expect(uri.queryParameters, isNot(contains('api_key')));
+    expect(uri.queryParameters['UserId'], 'user');
+    expect(uri.queryParameters['DeviceId'], 'device');
+  });
+
+  test('cache store normalizes legacy playback resume stream URL', () async {
+    SharedPreferences.setMockInitialValues({});
+    final cacheStore = CacheStore();
+    const track = MediaItem(
+      id: 'track-resume',
+      title: 'Resume',
+      album: 'Old Cache',
+      artists: ['Studio Band'],
+      duration: Duration(minutes: 2),
+      imageUrl: null,
+      streamUrl:
+          'https://demo.jellyfin.org/Audio/track-resume/universal?UserId=user&api_key=secret',
+    );
+
+    await cacheStore.savePlaybackResumeState(
+      const PlaybackResumeState(
+        track: track,
+        position: Duration(seconds: 30),
+      ),
+    );
+    final restored = await cacheStore.loadPlaybackResumeState();
+
+    expect(restored, isNotNull);
+    expect(
+      Uri.parse(restored!.track.streamUrl).queryParameters,
+      isNot(contains('api_key')),
+    );
+  });
+
   test('cache store saves whole-library offline pins', () async {
     SharedPreferences.setMockInitialValues({});
     final cacheStore = CacheStore();
@@ -97,6 +145,30 @@ void main() {
     await cacheStore.forgetPinnedAudioItems([track.streamUrl]);
     restored = await cacheStore.loadPinnedAudioItems();
     expect(restored, isEmpty);
+  });
+
+  test('clearOfflineAudioState clears offline pin metadata', () async {
+    SharedPreferences.setMockInitialValues({});
+    final cacheStore = CacheStore();
+    const track = MediaItem(
+      id: 'track-clear',
+      title: 'Clear Me',
+      album: 'Offline',
+      artists: ['Studio Band'],
+      duration: Duration(minutes: 4),
+      imageUrl: null,
+      streamUrl: 'https://demo.jellyfin.org/Audio/track-clear/stream',
+    );
+
+    await cacheStore.savePinnedAudio({track.streamUrl});
+    await cacheStore.savePinnedAudioItems([track]);
+    await cacheStore.saveWholeLibraryPinnedAudio({track.streamUrl});
+
+    await cacheStore.clearOfflineAudioState();
+
+    expect(await cacheStore.loadPinnedAudio(), isEmpty);
+    expect(await cacheStore.loadPinnedAudioItems(), isEmpty);
+    expect(await cacheStore.loadWholeLibraryPinnedAudio(), isEmpty);
   });
 }
 

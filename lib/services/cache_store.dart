@@ -404,9 +404,12 @@ class CacheStore {
   }
 
   /// Downloads audio for offline-ready playback.
-  Future<void> prefetchAudio(MediaItem item) async {
+  Future<void> prefetchAudio(
+    MediaItem item, {
+    Map<String, String>? headers,
+  }) async {
     try {
-      await _audioCache.downloadFile(item.streamUrl);
+      await _audioCache.downloadFile(item.streamUrl, authHeaders: headers);
       await _rememberCachedAudio(item);
       await enforceCacheLimit();
     } catch (e) {
@@ -446,8 +449,9 @@ class CacheStore {
   /// Prefetches the next track in the queue, when available.
   Future<void> prefetchNextFromQueue(
     List<MediaItem> queue,
-    int currentIndex,
-  ) async {
+    int currentIndex, {
+    Map<String, String>? headers,
+  }) async {
     final nextIndex = currentIndex + 1;
     if (nextIndex < 0 || nextIndex >= queue.length) {
       return;
@@ -456,20 +460,21 @@ class CacheStore {
     if (await isAudioCached(next)) {
       return;
     }
-    await prefetchAudio(next);
+    await prefetchAudio(next, headers: headers);
   }
 
   /// Handles cache updates when playback advances.
   Future<void> handlePlaybackAdvance(
     List<MediaItem> queue,
-    int currentIndex,
-  ) async {
+    int currentIndex, {
+    Map<String, String>? headers,
+  }) async {
     if (currentIndex < 0 || currentIndex >= queue.length) {
       return;
     }
     final current = queue[currentIndex];
     await touchCachedAudio(current);
-    await prefetchNextFromQueue(queue, currentIndex);
+    await prefetchNextFromQueue(queue, currentIndex, headers: headers);
   }
 
   /// Clears cached metadata for library lists and tracks.
@@ -512,6 +517,15 @@ class CacheStore {
     } catch (_) {
       // Ignore failures clearing the on-disk cache directory.
     }
+  }
+
+  /// Clears cached audio plus offline pin metadata for account sign-out.
+  Future<void> clearOfflineAudioState() async {
+    await clearAudioCache();
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.remove(_pinnedAudioKey);
+    await preferences.remove(_pinnedAudioItemsKey);
+    await preferences.remove(_wholeLibraryPinnedAudioKey);
   }
 
   /// Returns the approximate size of cached media on disk.

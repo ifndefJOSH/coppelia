@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter_cache_manager/flutter_cache_manager.dart';
+import 'package:flutter/services.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -79,6 +80,11 @@ void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   setUpAll(() {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(
+      const MethodChannel('coppelia/now_playing'),
+      (_) async => null,
+    );
     registerFallbackValue(_track('fallback'));
     registerFallbackValue(<String>{});
     registerFallbackValue(<String>[]);
@@ -130,6 +136,12 @@ void main() {
       () => cacheStore.loadCachedAudioEntries(),
     ).thenAnswer((_) async => const <CachedAudioEntry>[]);
     when(
+      () => cacheStore.clearOfflineAudioState(),
+    ).thenAnswer((_) async {});
+    when(
+      () => cacheStore.savePlaybackResumeState(null),
+    ).thenAnswer((_) async {});
+    when(
       () => cacheStore.setPinnedAudio(any(), any()),
     ).thenAnswer((_) async {});
     when(
@@ -179,6 +191,9 @@ void main() {
     ).thenAnswer((_) => const Stream<FileResponse>.empty());
     when(() => settingsStore.saveDownloadsPaused(any()))
         .thenAnswer((_) async {});
+    when(
+      () => sessionStore.saveSession(null),
+    ).thenAnswer((_) async {});
 
     return AppState(
       cacheStore: cacheStore,
@@ -242,6 +257,46 @@ void main() {
         .thenAnswer((_) async => const <MediaItem>[]);
     when(() => cacheStore.saveFavoriteTracks(any())).thenAnswer((_) async {});
   }
+
+  group('AppState session', () {
+    test('signOut clears offline audio state for the previous account',
+        () async {
+      final cacheStore = _MockCacheStore();
+      final client = _MockJellyfinClient();
+      final playback = _MockPlaybackController();
+      final sessionStore = _MockSessionStore();
+      final settingsStore = _MockSettingsStore();
+      final state = buildState(
+        cacheStore: cacheStore,
+        client: client,
+        playback: playback,
+        sessionStore: sessionStore,
+        settingsStore: settingsStore,
+      );
+      addTearDown(state.dispose);
+      stubSignedInRefresh(
+        cacheStore: cacheStore,
+        client: client,
+        sessionStore: sessionStore,
+      );
+
+      final signedIn = await state.signIn(
+        serverUrl: 'https://example.com',
+        username: 'user',
+        password: 'password',
+      );
+      expect(signedIn, isTrue);
+
+      await state.signOut();
+
+      verify(() => cacheStore.savePlaybackResumeState(null)).called(1);
+      verify(() => cacheStore.clearOfflineAudioState()).called(1);
+      verify(() => client.clearSession()).called(1);
+      verify(() => sessionStore.saveSession(null)).called(1);
+      expect(state.session, isNull);
+      expect(state.pinnedAudio, isEmpty);
+    });
+  });
 
   group('AppState playlist offline', () {
     test('makePlaylistAvailableOffline pins cached playlist tracks', () async {

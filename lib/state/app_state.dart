@@ -1134,7 +1134,6 @@ class AppState extends ChangeNotifier {
     final canonical = _client.buildStreamUrl(
       itemId: itemId,
       userId: session.userId,
-      token: session.accessToken,
     );
     return canonical.isEmpty ? streamUrl : canonical;
   }
@@ -1253,7 +1252,13 @@ class AppState extends ChangeNotifier {
         index == previousIndex) {
       return;
     }
-    unawaited(_cacheStore.handlePlaybackAdvance(_queue, index));
+    unawaited(
+      _cacheStore.handlePlaybackAdvance(
+        _queue,
+        index,
+        headers: _playbackHeaders(),
+      ),
+    );
   }
 
   void _bindNowPlaying() {
@@ -1769,13 +1774,12 @@ class AppState extends ChangeNotifier {
   }
 
   Map<String, String>? _playbackHeaders() {
-    final session = _session;
-    if (session == null) {
+    final headers = _client.authorizationHeaders;
+    if (headers == null) {
       return null;
     }
     return {
-      'X-Emby-Token': session.accessToken,
-      'X-Emby-Authorization': _client.authorizationHeader,
+      ...headers,
       'User-Agent': JellyfinClient.clientName,
     };
   }
@@ -1792,7 +1796,6 @@ class AppState extends ChangeNotifier {
     final streamUrl = _client.buildStreamUrl(
       itemId: track.id,
       userId: session.userId,
-      token: session.accessToken,
     );
     if (streamUrl.isEmpty || streamUrl == track.streamUrl) {
       return track;

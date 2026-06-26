@@ -117,6 +117,7 @@ extension AppStateSessionExtension on AppState {
   /// Signs out and clears cached state.
   Future<void> signOut() async {
     await _cacheStore.savePlaybackResumeState(null);
+    await _cacheStore.clearOfflineAudioState();
     _session = null;
     _client.clearSession();
     _selectedPlaylist = null;

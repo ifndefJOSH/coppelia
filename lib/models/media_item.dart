@@ -96,7 +96,6 @@ class MediaItem {
   factory MediaItem.fromJellyfin(
     Map<String, dynamic> json, {
     required String serverUrl,
-    required String token,
     required String userId,
     required String deviceId,
   }) {
@@ -122,7 +121,6 @@ class MediaItem {
         'AudioCodec': 'mp3,flac,vorbis,aac,opus,wav',
         'TranscodingContainer': 'mp3',
         'TranscodingProtocol': 'http',
-        'api_key': token,
       },
     );
     final streamUrl = streamUri.toString();
@@ -222,7 +220,7 @@ class MediaItem {
             const [],
         duration: Duration(milliseconds: json['durationMs'] as int? ?? 0),
         imageUrl: json['imageUrl'] as String?,
-        streamUrl: json['streamUrl'] as String,
+        streamUrl: _withoutLegacyApiKey(json['streamUrl'] as String),
         albumId: json['albumId'] as String?,
         artistIds: (json['artistIds'] as List<dynamic>?)
                 ?.map((entry) => entry.toString())
@@ -245,4 +243,19 @@ class MediaItem {
         bitrate: json['bitrate'] as int?,
         sampleRate: json['sampleRate'] as int?,
       );
+
+  // TODO: Remove this migration once pre-header-auth cache entries are stale.
+  static String _withoutLegacyApiKey(String streamUrl) {
+    final uri = Uri.tryParse(streamUrl);
+    if (uri == null || !uri.queryParameters.containsKey('api_key')) {
+      return streamUrl;
+    }
+    final queryParameters = Map<String, String>.from(uri.queryParameters)
+      ..remove('api_key');
+    return uri
+        .replace(
+          queryParameters: queryParameters.isEmpty ? null : queryParameters,
+        )
+        .toString();
+  }
 }
