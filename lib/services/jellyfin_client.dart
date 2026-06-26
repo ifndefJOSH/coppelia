@@ -42,8 +42,14 @@ class JellyfinClient {
   /// Currently authenticated session.
   AuthSession? get session => _session;
 
-  /// Authorization header for Jellyfin requests.
-  String get authorizationHeader => _authorizationHeader();
+  /// Headers for authenticated Jellyfin media requests.
+  Map<String, String>? get authorizationHeaders {
+    final session = _session;
+    if (session == null) {
+      return null;
+    }
+    return _authenticatedHeaders(session);
+  }
 
   /// Attaches a saved session for authenticated calls.
   void updateSession(AuthSession session) {
@@ -68,7 +74,6 @@ class JellyfinClient {
   String buildStreamUrl({
     required String itemId,
     required String userId,
-    required String token,
   }) {
     final session = _session;
     final serverUrl = session?.serverUrl;
@@ -83,7 +88,6 @@ class JellyfinClient {
         'AudioCodec': 'mp3,flac,vorbis,aac,opus,wav',
         'TranscodingContainer': 'mp3',
         'TranscodingProtocol': 'http',
-        'api_key': token,
       },
     );
     return streamUri.toString();
@@ -106,7 +110,7 @@ class JellyfinClient {
       uri,
       headers: {
         'Content-Type': 'application/json',
-        'X-Emby-Authorization': _authorizationHeader(),
+        'Authorization': _mediaBrowserAuthorization(),
       },
       body: jsonEncode({
         'Username': username,
@@ -146,11 +150,11 @@ class JellyfinClient {
         'IncludeItemTypes': 'Playlist',
         'Recursive': 'true',
         'SortBy': 'SortName',
-        'api_key': session.accessToken,
       },
     );
 
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       throw Exception('Unable to load playlists (${response.statusCode}).');
     }
@@ -175,10 +179,10 @@ class JellyfinClient {
         'Recursive': 'true',
         'SortBy': 'SortName',
         'Fields': 'ImageTags,ChildCount,AlbumArtist,AlbumArtists',
-        'api_key': session.accessToken,
       },
     );
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       throw Exception('Unable to load albums (${response.statusCode}).');
     }
@@ -200,10 +204,10 @@ class JellyfinClient {
         'UserId': session.userId,
         'SortBy': 'SortName',
         'Fields': 'ImageTags,SongCount,AlbumCount',
-        'api_key': session.accessToken,
       },
     );
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       throw Exception('Unable to load artists (${response.statusCode}).');
     }
@@ -226,10 +230,10 @@ class JellyfinClient {
         'SortBy': 'SortName',
         'IncludeItemTypes': 'Audio',
         'Fields': 'ImageTags,SongCount,AlbumCount',
-        'api_key': session.accessToken,
       },
     );
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       throw Exception('Unable to load genres (${response.statusCode}).');
     }
@@ -256,12 +260,12 @@ class JellyfinClient {
       queryParameters: {
         'Fields': 'RunTimeTicks,Artists,Album,ImageTags,AlbumId,ArtistItems,'
             'DateCreated,UserData,Genres,MediaStreams,Container',
-        'api_key': session.accessToken,
       },
     );
 
     await logService.info('JellyfinClient: Making HTTP request to ${uri.path}');
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
 
     if (response.statusCode != 200) {
       await logService.error('JellyfinClient: Failed to load playlist tracks',
@@ -278,7 +282,6 @@ class JellyfinClient {
         .map((item) => MediaItem.fromJellyfin(
               item as Map<String, dynamic>,
               serverUrl: session.serverUrl,
-              token: session.accessToken,
               userId: session.userId,
               deviceId: _deviceId,
             ))
@@ -294,7 +297,6 @@ class JellyfinClient {
     final params = <String, String>{
       'Name': name,
       'UserId': session.userId,
-      'api_key': session.accessToken,
     };
     if (itemIds.isNotEmpty) {
       params['Ids'] = itemIds.join(',');
@@ -302,7 +304,8 @@ class JellyfinClient {
     final uri = Uri.parse('${session.serverUrl}/Playlists').replace(
       queryParameters: params,
     );
-    final response = await _httpClient.post(uri);
+    final response =
+        await _httpClient.post(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw JellyfinRequestException(
         _errorMessage(
@@ -345,7 +348,6 @@ class JellyfinClient {
       '${session.serverUrl}/Items/$playlistId',
     ).replace(
       queryParameters: {
-        'api_key': session.accessToken,
         'UserId': session.userId,
       },
     );
@@ -363,7 +365,6 @@ class JellyfinClient {
       queryParameters: {
         'Name': name,
         'UserId': session.userId,
-        'api_key': session.accessToken,
       },
     );
     final fallbackResponse = await _httpClient.post(
@@ -390,7 +391,6 @@ class JellyfinClient {
       '${session.serverUrl}/Items/$playlistId',
     ).replace(
       queryParameters: {
-        'api_key': session.accessToken,
         'UserId': session.userId,
       },
     );
@@ -421,7 +421,6 @@ class JellyfinClient {
       queryParameters: {
         'Ids': itemIds.join(','),
         'UserId': session.userId,
-        'api_key': session.accessToken,
       },
     );
     final response = await _httpClient.post(
@@ -436,7 +435,6 @@ class JellyfinClient {
       Uri.parse('${session.serverUrl}/Playlists/$playlistId/Items').replace(
         queryParameters: {
           'UserId': session.userId,
-          'api_key': session.accessToken,
         },
       ),
       headers: headers,
@@ -465,7 +463,6 @@ class JellyfinClient {
     final session = _requireSession();
     final headers = _playlistHeaders(session);
     final params = <String, String>{
-      'api_key': session.accessToken,
       'UserId': session.userId,
     };
     if (entryIds.isNotEmpty) {
@@ -485,7 +482,6 @@ class JellyfinClient {
           .replace(
         queryParameters: {
           'UserId': session.userId,
-          'api_key': session.accessToken,
         },
       ),
       headers: headers,
@@ -522,7 +518,6 @@ class JellyfinClient {
         queryParameters: {
           paramName: entryIds.join(','),
           'UserId': session.userId,
-          'api_key': session.accessToken,
         },
       );
       return _httpClient.post(
@@ -545,7 +540,6 @@ class JellyfinClient {
         ).replace(
           queryParameters: {
             'UserId': session.userId,
-            'api_key': session.accessToken,
           },
         ),
         headers: headers,
@@ -590,11 +584,10 @@ class JellyfinClient {
   }
 
   Map<String, String> _playlistHeaders(AuthSession session) {
-    return {
-      'Content-Type': 'application/json; charset=utf-8',
-      'X-Emby-Authorization': _authorizationHeader(),
-      'X-Emby-Token': session.accessToken,
-    };
+    return _authenticatedHeaders(
+      session,
+      contentType: 'application/json; charset=utf-8',
+    );
   }
 
   /// Fetches tracks for an album.
@@ -612,12 +605,12 @@ class JellyfinClient {
         'Recursive': 'true',
         'Fields': 'RunTimeTicks,Artists,Album,ImageTags,AlbumId,ArtistItems,'
             'DateCreated,UserData,Genres,MediaStreams,Container',
-        'api_key': session.accessToken,
       },
     );
 
     await logService.info('JellyfinClient: Making HTTP request to ${uri.path}');
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
 
     if (response.statusCode != 200) {
       await logService.error('JellyfinClient: Failed to load album tracks',
@@ -634,7 +627,6 @@ class JellyfinClient {
         .map((item) => MediaItem.fromJellyfin(
               item as Map<String, dynamic>,
               serverUrl: session.serverUrl,
-              token: session.accessToken,
               userId: session.userId,
               deviceId: _deviceId,
             ))
@@ -654,10 +646,10 @@ class JellyfinClient {
         'SortBy': 'Album,SortName',
         'Fields': 'RunTimeTicks,Artists,Album,ImageTags,AlbumId,ArtistItems,'
             'DateCreated,UserData,Genres',
-        'api_key': session.accessToken,
       },
     );
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       throw Exception('Unable to load artist tracks.');
     }
@@ -667,7 +659,6 @@ class JellyfinClient {
         .map((item) => MediaItem.fromJellyfin(
               item as Map<String, dynamic>,
               serverUrl: session.serverUrl,
-              token: session.accessToken,
               userId: session.userId,
               deviceId: _deviceId,
             ))
@@ -687,10 +678,10 @@ class JellyfinClient {
         'SortBy': 'Album,SortName',
         'Fields': 'RunTimeTicks,Artists,Album,ImageTags,AlbumId,ArtistItems,'
             'DateCreated,UserData,Genres',
-        'api_key': session.accessToken,
       },
     );
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       throw Exception('Unable to load genre tracks.');
     }
@@ -700,7 +691,6 @@ class JellyfinClient {
         .map((item) => MediaItem.fromJellyfin(
               item as Map<String, dynamic>,
               serverUrl: session.serverUrl,
-              token: session.accessToken,
               userId: session.userId,
               deviceId: _deviceId,
             ))
@@ -719,10 +709,10 @@ class JellyfinClient {
         'Filters': 'IsFavorite',
         'SortBy': 'SortName',
         'Fields': 'ImageTags,ChildCount,AlbumArtist,AlbumArtists',
-        'api_key': session.accessToken,
       },
     );
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       throw Exception('Unable to load favorite albums.');
     }
@@ -756,10 +746,10 @@ class JellyfinClient {
           'StartIndex': '$startIndex',
           'Limit': '$pageSize',
           'Fields': 'ImageTags,SongCount,AlbumCount,UserData',
-          'api_key': session.accessToken,
         },
       );
-      final response = await _httpClient.get(uri);
+      final response =
+          await _httpClient.get(uri, headers: _authenticatedHeaders(session));
       if (response.statusCode != 200) {
         if (hadSuccess) {
           break;
@@ -814,10 +804,10 @@ class JellyfinClient {
         'SortBy': 'SortName',
         'Fields': 'RunTimeTicks,Artists,Album,ImageTags,AlbumId,ArtistItems,'
             'DateCreated,UserData,Genres',
-        'api_key': session.accessToken,
       },
     );
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       throw Exception('Unable to load favorite tracks.');
     }
@@ -827,7 +817,6 @@ class JellyfinClient {
         .map((item) => MediaItem.fromJellyfin(
               item as Map<String, dynamic>,
               serverUrl: session.serverUrl,
-              token: session.accessToken,
               userId: session.userId,
               deviceId: _deviceId,
             ))
@@ -840,17 +829,12 @@ class JellyfinClient {
     required bool isFavorite,
   }) async {
     final session = _requireSession();
-    final headers = {
-      'Content-Type': 'application/json; charset=utf-8',
-      'X-Emby-Authorization': _authorizationHeader(),
-      'X-Emby-Token': session.accessToken,
-    };
+    final headers = _authenticatedHeaders(
+      session,
+      contentType: 'application/json; charset=utf-8',
+    );
     final uri = Uri.parse(
       '${session.serverUrl}/Users/${session.userId}/FavoriteItems/$itemId',
-    ).replace(
-      queryParameters: {
-        'api_key': session.accessToken,
-      },
     );
     final response = isFavorite
         ? await _httpClient.post(uri, headers: headers)
@@ -860,10 +844,6 @@ class JellyfinClient {
     }
     final userDataUri = Uri.parse(
       '${session.serverUrl}/Users/${session.userId}/Items/$itemId/UserData',
-    ).replace(
-      queryParameters: {
-        'api_key': session.accessToken,
-      },
     );
     final userDataResponse = await _httpClient.post(
       userDataUri,
@@ -886,17 +866,10 @@ class JellyfinClient {
     final session = _requireSession();
     final uri = Uri.parse(
       '${session.serverUrl}/Users/${session.userId}/Items/$itemId/UserData',
-    ).replace(
-      queryParameters: {
-        'api_key': session.accessToken,
-      },
     );
     final response = await _httpClient.get(
       uri,
-      headers: {
-        'X-Emby-Authorization': _authorizationHeader(),
-        'X-Emby-Token': session.accessToken,
-      },
+      headers: _authenticatedHeaders(session),
     );
     if (response.statusCode != 200) {
       return null;
@@ -978,14 +951,14 @@ class JellyfinClient {
         'limit': '100',
         'includeItemTypes':
             'Audio,MusicAlbum,MusicArtist,Artist,Genre,Playlist',
-        'api_key': session.accessToken,
       },
     );
 
     await LogService.instance
         .then((log) => log.info('Search: GET ${uri.path}?searchTerm=$query'));
 
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
 
     await LogService.instance.then(
         (log) => log.info('Search: Response status ${response.statusCode}'));
@@ -1051,7 +1024,6 @@ class JellyfinClient {
           MediaItem.fromJellyfin(
             normalized,
             serverUrl: session.serverUrl,
-            token: session.accessToken,
             userId: session.userId,
             deviceId: _deviceId,
           ),
@@ -1109,10 +1081,10 @@ class JellyfinClient {
         'Recursive': 'true',
         'Fields': 'RunTimeTicks,Artists,Album,ImageTags,AlbumId,ArtistItems,'
             'DateCreated,UserData,Genres',
-        'api_key': session.accessToken,
       },
     );
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       throw Exception('Unable to load recent tracks.');
     }
@@ -1122,7 +1094,6 @@ class JellyfinClient {
         .map((item) => MediaItem.fromJellyfin(
               item as Map<String, dynamic>,
               serverUrl: session.serverUrl,
-              token: session.accessToken,
               userId: session.userId,
               deviceId: _deviceId,
             ))
@@ -1143,10 +1114,10 @@ class JellyfinClient {
         'Recursive': 'true',
         'Fields': 'RunTimeTicks,Artists,Album,ImageTags,AlbumId,ArtistItems,'
             'DateCreated,UserData,Genres',
-        'api_key': session.accessToken,
       },
     );
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       throw Exception('Unable to load recently played tracks.');
     }
@@ -1156,7 +1127,6 @@ class JellyfinClient {
         .map((item) => MediaItem.fromJellyfin(
               item as Map<String, dynamic>,
               serverUrl: session.serverUrl,
-              token: session.accessToken,
               userId: session.userId,
               deviceId: _deviceId,
             ))
@@ -1178,12 +1148,12 @@ class JellyfinClient {
       'Limit': '$limit',
       'Fields': 'RunTimeTicks,Artists,Album,ImageTags,AlbumId,ArtistItems,'
           'DateCreated,UserData,Genres,MediaStreams,Container',
-      'api_key': session.accessToken,
     };
     final uri = Uri.parse(
       '${session.serverUrl}/Users/${session.userId}/Items',
     ).replace(queryParameters: query);
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       throw Exception('Unable to load tracks.');
     }
@@ -1193,7 +1163,6 @@ class JellyfinClient {
         .map((item) => MediaItem.fromJellyfin(
               item as Map<String, dynamic>,
               serverUrl: session.serverUrl,
-              token: session.accessToken,
               userId: session.userId,
               deviceId: _deviceId,
             ))
@@ -1213,10 +1182,10 @@ class JellyfinClient {
         'Limit': '1',
         'Fields': 'RunTimeTicks,Artists,Album,ImageTags,AlbumId,ArtistItems,'
             'DateCreated,UserData,Genres',
-        'api_key': session.accessToken,
       },
     );
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       return null;
     }
@@ -1228,7 +1197,6 @@ class JellyfinClient {
     return MediaItem.fromJellyfin(
       items.first as Map<String, dynamic>,
       serverUrl: session.serverUrl,
-      token: session.accessToken,
       userId: session.userId,
       deviceId: _deviceId,
     );
@@ -1246,10 +1214,10 @@ class JellyfinClient {
         'SortBy': 'Random',
         'Limit': '1',
         'Fields': 'ImageTags,ChildCount,AlbumArtist,AlbumArtists',
-        'api_key': session.accessToken,
       },
     );
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       return null;
     }
@@ -1273,10 +1241,10 @@ class JellyfinClient {
         'SortBy': 'Random',
         'Limit': '1',
         'Fields': 'ImageTags,SongCount,AlbumCount',
-        'api_key': session.accessToken,
       },
     );
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       return null;
     }
@@ -1330,9 +1298,29 @@ class JellyfinClient {
     return session;
   }
 
-  String _authorizationHeader() {
-    return 'MediaBrowser Client="$clientName", Device="$_deviceName", '
-        'DeviceId="$_deviceId", Version="$clientVersion"';
+  Map<String, String> _authenticatedHeaders(
+    AuthSession session, {
+    String? contentType,
+  }) {
+    return {
+      if (contentType != null) 'Content-Type': contentType,
+      'Authorization': _mediaBrowserAuthorization(token: session.accessToken),
+    };
+  }
+
+  String _mediaBrowserAuthorization({String? token}) {
+    final values = [
+      if (token != null) 'Token="${_escapeAuthorizationValue(token)}"',
+      'Client="${_escapeAuthorizationValue(clientName)}"',
+      'Device="${_escapeAuthorizationValue(_deviceName)}"',
+      'DeviceId="${_escapeAuthorizationValue(_deviceId)}"',
+      'Version="${_escapeAuthorizationValue(clientVersion)}"',
+    ];
+    return 'MediaBrowser ${values.join(', ')}';
+  }
+
+  String _escapeAuthorizationValue(String value) {
+    return value.replaceAll(r'\', r'\\').replaceAll('"', r'\"');
   }
 
   Future<int> _fetchItemCount({
@@ -1346,10 +1334,10 @@ class JellyfinClient {
         'IncludeItemTypes': includeItemTypes,
         'Recursive': 'true',
         'Limit': '0',
-        'api_key': session.accessToken,
       },
     );
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       throw Exception('Unable to load item count for $includeItemTypes.');
     }
@@ -1362,10 +1350,10 @@ class JellyfinClient {
       queryParameters: {
         'UserId': session.userId,
         'Limit': '0',
-        'api_key': session.accessToken,
       },
     );
-    final response = await _httpClient.get(uri);
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
     if (response.statusCode != 200) {
       throw Exception('Unable to load artist count.');
     }
@@ -1388,11 +1376,7 @@ class JellyfinClient {
     bool completed = false,
   }) async {
     final session = _requireSession();
-    final uri = Uri.parse('${session.serverUrl}/Sessions/$endpoint').replace(
-      queryParameters: {
-        'api_key': session.accessToken,
-      },
-    );
+    final uri = Uri.parse('${session.serverUrl}/Sessions/$endpoint');
     final payload = <String, dynamic>{
       'ItemId': track.id,
       'MediaSourceId': track.id,
@@ -1410,10 +1394,10 @@ class JellyfinClient {
     }
     final response = await _httpClient.post(
       uri,
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Emby-Authorization': _authorizationHeader(),
-      },
+      headers: _authenticatedHeaders(
+        session,
+        contentType: 'application/json',
+      ),
       body: jsonEncode(payload),
     );
     if (response.statusCode < 200 || response.statusCode >= 300) {

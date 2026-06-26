@@ -43,6 +43,19 @@ void main() {
     expect(session.userId, 'user-1');
     expect(session.userName, 'Jordan');
     expect(session.serverUrl, 'https://demo.jellyfin.org');
+
+    final captured = verify(
+      () => client.post(
+        captureAny(),
+        headers: captureAny(named: 'headers'),
+        body: captureAny(named: 'body'),
+      ),
+    ).captured;
+    final headers = captured[1] as Map<String, String>;
+    expect(headers['Authorization'], startsWith('MediaBrowser '));
+    expect(headers['Authorization'], contains('Client="Coppelia"'));
+    expect(headers, isNot(contains('X-Emby-Authorization')));
+    expect(headers, isNot(contains('X-Emby-Token')));
   });
 
   test('fetchPlaylists maps Jellyfin responses', () async {
@@ -57,7 +70,12 @@ void main() {
       ),
     );
 
-    when(() => client.get(any())).thenAnswer(
+    when(
+      () => client.get(
+        any(),
+        headers: any(named: 'headers'),
+      ),
+    ).thenAnswer(
       (_) async => http.Response(
         jsonEncode({
           'Items': [
@@ -77,5 +95,18 @@ void main() {
     expect(playlists, hasLength(1));
     expect(playlists.first.name, 'Morning Focus');
     expect(playlists.first.trackCount, 12);
+
+    final captured = verify(
+      () => client.get(
+        captureAny(),
+        headers: captureAny(named: 'headers'),
+      ),
+    ).captured;
+    final uri = captured[0] as Uri;
+    final headers = captured[1] as Map<String, String>;
+    expect(uri.queryParameters, isNot(contains('api_key')));
+    expect(headers['Authorization'], contains('Token="token"'));
+    expect(headers, isNot(contains('X-Emby-Authorization')));
+    expect(headers, isNot(contains('X-Emby-Token')));
   });
 }
