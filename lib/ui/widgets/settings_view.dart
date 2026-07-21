@@ -2560,6 +2560,7 @@ class _SettingRow extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isNarrow = constraints.maxWidth < 520;
+        final mustStack = constraints.maxWidth < 420;
         final textBlock = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2574,7 +2575,7 @@ class _SettingRow extends StatelessWidget {
             ),
           ],
         );
-        if (isNarrow && !forceInline) {
+        if (mustStack || (isNarrow && !forceInline)) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
