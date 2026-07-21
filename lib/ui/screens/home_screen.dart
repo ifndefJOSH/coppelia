@@ -51,9 +51,26 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    return Scaffold(
-      body: GradientBackground(
-        child: _MainContent(state: state),
+    final handlesBack =
+        state.isSidebarOverlayOpen || state.isSearching || state.canGoBack;
+    return PopScope(
+      canPop: !handlesBack,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          return;
+        }
+        if (state.isSidebarOverlayOpen) {
+          state.setSidebarOverlayOpen(false);
+          return;
+        }
+        if (state.isSearching || state.canGoBack) {
+          state.goBack();
+        }
+      },
+      child: Scaffold(
+        body: GradientBackground(
+          child: _MainContent(state: state),
+        ),
       ),
     );
   }
