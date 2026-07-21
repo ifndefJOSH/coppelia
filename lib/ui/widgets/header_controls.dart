@@ -5,6 +5,26 @@ import '../../core/color_tokens.dart';
 import '../../state/app_state.dart';
 import 'corner_radius.dart';
 
+/// Provides the actual left-sidebar visibility state for shared headers.
+class SidebarMenuScope extends InheritedWidget {
+  const SidebarMenuScope({
+    super.key,
+    required this.autoCollapsed,
+    required super.child,
+  });
+
+  final bool autoCollapsed;
+
+  static SidebarMenuScope? maybeOf(BuildContext context) {
+    return context.dependOnInheritedWidgetOfExactType<SidebarMenuScope>();
+  }
+
+  @override
+  bool updateShouldNotify(SidebarMenuScope oldWidget) {
+    return autoCollapsed != oldWidget.autoCollapsed;
+  }
+}
+
 /// Circular button used in headers for navigation controls and search.
 class HeaderControlButton extends StatelessWidget {
   const HeaderControlButton({
@@ -25,10 +45,7 @@ class HeaderControlButton extends StatelessWidget {
     final theme = Theme.of(context);
     final radius = context.scaledRadius(size);
     final color = onTap == null
-        ? theme
-            .colorScheme
-            .onSurface
-            .withValues(alpha: 0.38)
+        ? theme.colorScheme.onSurface.withValues(alpha: 0.38)
         : theme.colorScheme.onSurface;
     final background = theme.colorScheme.surfaceContainerHighest;
     return Material(
@@ -74,8 +91,11 @@ class SidebarMenuButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
+    final scopedAutoCollapsed =
+        SidebarMenuScope.maybeOf(context)?.autoCollapsed;
     const autoCollapseWidth = 640.0;
-    final autoCollapsed = MediaQuery.of(context).size.width < autoCollapseWidth;
+    final autoCollapsed = scopedAutoCollapsed ??
+        MediaQuery.of(context).size.width < autoCollapseWidth;
     final shouldShow = autoCollapsed || state.isSidebarCollapsed;
     if (!shouldShow) {
       return const SizedBox.shrink();
@@ -134,8 +154,7 @@ class SearchCircleButton extends StatelessWidget {
               borderRadius: BorderRadius.circular(radius),
               boxShadow: [
                 BoxShadow(
-                  color:
-                      theme.colorScheme.primary.withValues(alpha: 0.3),
+                  color: theme.colorScheme.primary.withValues(alpha: 0.3),
                   blurRadius: 6,
                   offset: const Offset(0, 1),
                 ),

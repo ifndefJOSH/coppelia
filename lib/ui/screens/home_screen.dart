@@ -151,19 +151,22 @@ class _MainContentState extends State<_MainContent> {
               );
 
         final content = Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(top: topInset + topGutter),
-                  child: AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 350),
-                    child: _LibraryContent(state: state),
+          child: SidebarMenuScope(
+            autoCollapsed: autoCollapsed,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Padding(
+                    padding: EdgeInsets.only(top: topInset + topGutter),
+                    child: AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 350),
+                      child: _LibraryContent(state: state),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
 
@@ -270,20 +273,28 @@ class _MainContentState extends State<_MainContent> {
       },
     );
 
-    if (state.nowPlayingLayout == NowPlayingLayout.side) {
-      return Row(
-        children: [
-          Expanded(child: bodyContent),
-          NowPlayingPanel(layout: state.nowPlayingLayout),
-        ],
-      );
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final panelLayout = effectiveNowPlayingLayout(
+          preferredLayout: state.nowPlayingLayout,
+          maxWidth: constraints.maxWidth,
+        );
+        if (panelLayout == NowPlayingLayout.side) {
+          return Row(
+            children: [
+              Expanded(child: bodyContent),
+              NowPlayingPanel(layout: panelLayout),
+            ],
+          );
+        }
 
-    return Column(
-      children: [
-        Expanded(child: bodyContent),
-        NowPlayingPanel(layout: state.nowPlayingLayout),
-      ],
+        return Column(
+          children: [
+            Expanded(child: bodyContent),
+            NowPlayingPanel(layout: panelLayout),
+          ],
+        );
+      },
     );
   }
 }
