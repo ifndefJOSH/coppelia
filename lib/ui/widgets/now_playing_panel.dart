@@ -93,10 +93,18 @@ Future<void> _showNowPlayingTrackMenu(
   );
 }
 
-class _SidePanel extends StatelessWidget {
+class _SidePanel extends StatefulWidget {
   const _SidePanel({required this.layout});
 
   final NowPlayingLayout layout;
+  static const double _width = 256;
+
+  @override
+  State<_SidePanel> createState() => _SidePanelState();
+}
+
+class _SidePanelState extends State<_SidePanel> {
+  bool _showQueue = false;
 
   @override
   Widget build(BuildContext context) {
@@ -113,8 +121,8 @@ class _SidePanel extends StatelessWidget {
         track == null ? false : state.isFavoriteTrackUpdating(track.id);
     final neighbors = _adjacentTracks(state.queue, track);
     return Container(
-      width: 320,
-      padding: const EdgeInsets.fromLTRB(20, 24, 20, 24).scale(densityScale),
+      width: _SidePanel._width,
+      padding: const EdgeInsets.fromLTRB(14, 18, 14, 18).scale(densityScale),
       decoration: BoxDecoration(
         color: ColorTokens.panelBackground(context),
         border: Border(
@@ -124,22 +132,6 @@ class _SidePanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Text(
-                'Now playing',
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-              const Spacer(),
-              if (track != null)
-                _FavoriteButton(
-                  track: track,
-                  isFavorite: isFavorite,
-                  isUpdating: isUpdating,
-                ),
-            ],
-          ),
-          SizedBox(height: space(20)),
           _SwipeTrackSwitcher(
             current: track,
             previous: neighbors.previous,
@@ -158,20 +150,20 @@ class _SidePanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _Artwork(track: item),
-                  SizedBox(height: space(20)),
+                  SizedBox(height: space(12).clamp(8.0, 16.0)),
                   Text(
                     item?.title ?? 'Nothing queued',
                     style: Theme.of(context).textTheme.titleLarge,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
-                  SizedBox(height: space(6).clamp(4.0, 10.0)),
+                  SizedBox(height: space(3).clamp(2.0, 6.0)),
                   _NowPlayingMeta(track: item),
                 ],
               );
             },
           ),
-          SizedBox(height: space(20)),
+          SizedBox(height: space(10).clamp(6.0, 14.0)),
           AnimatedBuilder(
             animation: Listenable.merge([
               state.positionListenable,
@@ -182,32 +174,72 @@ class _SidePanel extends StatelessWidget {
                 position: state.position,
                 duration: state.duration,
                 onSeek: state.seek,
+                compact: true,
               );
             },
           ),
-          SizedBox(height: space(12)),
-          Center(
-            child: _Controls(
-              isPlaying: state.isPlaying,
-              isPreparingPlayback: state.isPreparingPlayback,
-              onPlayPause: state.togglePlayback,
-              onNext: state.nextTrack,
-              onPrevious: state.previousTrack,
-            ),
+          SizedBox(height: space(6).clamp(4.0, 10.0)),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              if (track != null)
+                _FavoriteButton(
+                  track: track,
+                  isFavorite: isFavorite,
+                  isUpdating: isUpdating,
+                )
+              else
+                const SizedBox(width: 24),
+              _Controls(
+                isPlaying: state.isPlaying,
+                isPreparingPlayback: state.isPreparingPlayback,
+                onPlayPause: state.togglePlayback,
+                onNext: state.nextTrack,
+                onPrevious: state.previousTrack,
+                compact: true,
+              ),
+              IconButton(
+                tooltip: _showQueue ? 'Hide queue' : 'Show queue',
+                icon: const Icon(Icons.queue_music),
+                onPressed: () {
+                  setState(() {
+                    _showQueue = !_showQueue;
+                  });
+                },
+                style: _showQueue
+                    ? IconButton.styleFrom(
+                        backgroundColor: Theme.of(context)
+                            .colorScheme
+                            .primary
+                            .withValues(alpha: 0.12),
+                        foregroundColor: Theme.of(context).colorScheme.primary,
+                      )
+                    : null,
+                visualDensity: VisualDensity.compact,
+                padding: EdgeInsets.zero,
+                constraints: const BoxConstraints.tightFor(
+                  width: 36,
+                  height: 36,
+                ),
+              ),
+            ],
           ),
-          SizedBox(height: space(20)),
-          Divider(color: ColorTokens.border(context, 0.12)),
-          SizedBox(height: space(16)),
-          Text(
-            'Playing next',
-            style: Theme.of(context)
-                .textTheme
-                .titleSmall
-                ?.copyWith(color: ColorTokens.textSecondary(context, 0.7)),
-          ),
-          SizedBox(height: space(12)),
           Expanded(
-            child: _QueueList(queue: state.queue, nowPlaying: track),
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 180),
+              switchInCurve: Curves.easeOutCubic,
+              switchOutCurve: Curves.easeInCubic,
+              child: _showQueue
+                  ? _SidePanelQueue(
+                      key: const ValueKey('side-panel-queue'),
+                      queue: state.queue,
+                      nowPlaying: track,
+                      onPlayQueueIndex: state.playQueueIndex,
+                    )
+                  : const SizedBox.shrink(
+                      key: ValueKey('side-panel-queue-collapsed'),
+                    ),
+            ),
           ),
         ],
       ),
@@ -446,48 +478,169 @@ class _BottomBar extends StatelessWidget {
   }
 }
 
-class _QueueList extends StatelessWidget {
-  const _QueueList({required this.queue, required this.nowPlaying});
+class _SidePanelQueue extends StatelessWidget {
+  const _SidePanelQueue({
+    super.key,
+    required this.queue,
+    required this.nowPlaying,
+    required this.onPlayQueueIndex,
+  });
 
   final List<MediaItem> queue;
   final MediaItem? nowPlaying;
+  final Future<void> Function(int index) onPlayQueueIndex;
 
   @override
   Widget build(BuildContext context) {
     final densityScale = context.watch<AppState>().layoutDensity.scaleDouble;
     double space(double value) => value * densityScale;
-    if (queue.isEmpty) {
-      return Text(
-        'Queue is empty.',
-        style: Theme.of(context)
-            .textTheme
-            .bodySmall
-            ?.copyWith(color: ColorTokens.textSecondary(context)),
-      );
-    }
-    final startIndex = nowPlaying == null
-        ? 0
+    double clamped(double value, {double min = 0, double max = 999}) =>
+        (value * densityScale).clamp(min, max);
+    final currentIndex = nowPlaying == null
+        ? -1
         : queue.indexWhere((item) => item.id == nowPlaying!.id);
-    final safeIndex = startIndex < 0 ? 0 : startIndex;
-    final visibleQueue = queue.sublist(safeIndex);
-    return ListView.builder(
-      itemCount: visibleQueue.length,
-      itemBuilder: (context, index) {
-        final item = visibleQueue[index];
-        return Padding(
-          padding: EdgeInsets.only(bottom: space(8).clamp(4.0, 12.0)),
-          child: Text(
-            item.title,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: item.id == nowPlaying?.id
-                      ? ColorTokens.textPrimary(context)
-                      : ColorTokens.textSecondary(context),
-                ),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
+    final firstNextIndex = currentIndex < 0 ? 0 : currentIndex + 1;
+    final upcoming = <({int index, MediaItem track})>[
+      for (var index = firstNextIndex; index < queue.length; index++)
+        (index: index, track: queue[index]),
+    ];
+
+    return Padding(
+      padding: EdgeInsets.only(top: space(12).clamp(8.0, 16.0)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Divider(color: ColorTokens.border(context, 0.12), height: 1),
+          SizedBox(height: space(10).clamp(6.0, 14.0)),
+          Row(
+            children: [
+              Text(
+                'Next playing',
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: ColorTokens.textSecondary(context, 0.8),
+                    ),
+              ),
+              const Spacer(),
+              Text(
+                '${upcoming.length}',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: ColorTokens.textSecondary(context, 0.62),
+                    ),
+              ),
+            ],
           ),
-        );
-      },
+          SizedBox(height: space(8).clamp(6.0, 12.0)),
+          Expanded(
+            child: upcoming.isEmpty
+                ? Text(
+                    'End of queue.',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: ColorTokens.textSecondary(context, 0.7),
+                        ),
+                  )
+                : ListView.separated(
+                    padding: EdgeInsets.zero,
+                    itemCount: upcoming.length,
+                    separatorBuilder: (context, index) =>
+                        SizedBox(height: space(6).clamp(4.0, 10.0)),
+                    itemBuilder: (context, index) {
+                      final item = upcoming[index];
+                      return _SidePanelQueueItem(
+                        track: item.track,
+                        queueIndex: item.index,
+                        artworkSize: clamped(34, min: 28, max: 40),
+                        onTap: () => onPlayQueueIndex(item.index),
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SidePanelQueueItem extends StatelessWidget {
+  const _SidePanelQueueItem({
+    required this.track,
+    required this.queueIndex,
+    required this.artworkSize,
+    required this.onTap,
+  });
+
+  final MediaItem track;
+  final int queueIndex;
+  final double artworkSize;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final densityScale = context.watch<AppState>().layoutDensity.scaleDouble;
+    double space(double value) => value * densityScale;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(context.scaledRadius(12)),
+        onTap: onTap,
+        onSecondaryTapDown: (details) =>
+            _showNowPlayingTrackMenu(context, details.globalPosition, track),
+        child: Padding(
+          padding: EdgeInsets.symmetric(
+            horizontal: space(4).clamp(2.0, 6.0),
+            vertical: space(4).clamp(3.0, 6.0),
+          ),
+          child: Row(
+            children: [
+              Text(
+                '${queueIndex + 1}',
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: ColorTokens.textSecondary(context, 0.55),
+                    ),
+              ),
+              SizedBox(width: space(8).clamp(6.0, 10.0)),
+              _NowPlayingArtworkImage(
+                imageUrl: track.imageUrl,
+                size: artworkSize,
+                borderRadius: context.scaledRadius(8),
+                iconSize: (16 * densityScale).clamp(12.0, 18.0),
+              ),
+              SizedBox(width: space(8).clamp(6.0, 10.0)),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      track.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: ColorTokens.textPrimary(context),
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    SizedBox(height: space(2).clamp(1.0, 4.0)),
+                    Text(
+                      track.subtitle,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                            color: ColorTokens.textSecondary(context, 0.68),
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: space(6).clamp(4.0, 8.0)),
+              Text(
+                formatDuration(track.duration),
+                style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                      color: ColorTokens.textSecondary(context, 0.55),
+                    ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -978,6 +1131,7 @@ class _Controls extends StatelessWidget {
     required this.onPlayPause,
     required this.onNext,
     required this.onPrevious,
+    this.compact = false,
   });
 
   final bool isPlaying;
@@ -985,13 +1139,23 @@ class _Controls extends StatelessWidget {
   final VoidCallback onPlayPause;
   final VoidCallback onNext;
   final VoidCallback onPrevious;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final densityScale = context.watch<AppState>().layoutDensity.scaleDouble;
     double clamped(double value, {double min = 0, double max = 999}) =>
         (value * densityScale).clamp(min, max);
-    final iconSize = clamped(24, min: 18, max: 28);
+    final iconSize =
+        compact ? clamped(20, min: 16, max: 24) : clamped(24, min: 18, max: 28);
+    final iconButtonSize =
+        compact ? clamped(36, min: 32, max: 40) : clamped(48, min: 40, max: 56);
+    final playButtonSize =
+        compact ? clamped(44, min: 38, max: 50) : clamped(52, min: 42, max: 62);
+    final playPadding =
+        compact ? clamped(10, min: 8, max: 14) : clamped(14, min: 10, max: 18);
+    final playIconSize =
+        compact ? clamped(20, min: 16, max: 24) : clamped(22, min: 16, max: 26);
     return Row(
       mainAxisSize: MainAxisSize.min,
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -1000,10 +1164,18 @@ class _Controls extends StatelessWidget {
           iconSize: iconSize,
           icon: const Icon(Icons.skip_previous),
           onPressed: onPrevious,
+          visualDensity: compact ? VisualDensity.compact : null,
+          padding: compact ? EdgeInsets.zero : null,
+          constraints: compact
+              ? BoxConstraints.tightFor(
+                  width: iconButtonSize,
+                  height: iconButtonSize,
+                )
+              : null,
         ),
         SizedBox(
-          width: clamped(52, min: 42, max: 62),
-          height: clamped(52, min: 42, max: 62),
+          width: playButtonSize,
+          height: playButtonSize,
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -1012,19 +1184,19 @@ class _Controls extends StatelessWidget {
                 style: FilledButton.styleFrom(
                   shape: const CircleBorder(),
                   padding: EdgeInsets.all(
-                    clamped(14, min: 10, max: 18),
+                    playPadding,
                   ),
                 ),
                 child: Icon(
                   isPlaying ? Icons.pause : Icons.play_arrow,
-                  size: clamped(22, min: 16, max: 26),
+                  size: playIconSize,
                 ),
               ),
               if (isPreparingPlayback)
                 IgnorePointer(
                   child: SizedBox(
-                    width: clamped(52, min: 42, max: 62),
-                    height: clamped(52, min: 42, max: 62),
+                    width: playButtonSize,
+                    height: playButtonSize,
                     child: CircularProgressIndicator(
                       strokeWidth: 2,
                       valueColor: AlwaysStoppedAnimation<Color>(
@@ -1043,6 +1215,14 @@ class _Controls extends StatelessWidget {
           iconSize: iconSize,
           icon: const Icon(Icons.skip_next),
           onPressed: onNext,
+          visualDensity: compact ? VisualDensity.compact : null,
+          padding: compact ? EdgeInsets.zero : null,
+          constraints: compact
+              ? BoxConstraints.tightFor(
+                  width: iconButtonSize,
+                  height: iconButtonSize,
+                )
+              : null,
         ),
       ],
     );
