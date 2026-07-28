@@ -60,6 +60,8 @@ class SettingsStore {
       'settings_gesture_sidebar_swipe_enabled';
   static const _nowPlayingSwipeEnabledKey =
       'settings_gesture_now_playing_swipe_enabled';
+  static const _nowPlayingExpandGestureEnabledKey =
+      'settings_gesture_now_playing_expand_enabled';
   static const _layoutDensityKey = 'settings_layout_density';
   static const _cornerRadiusStyleKey = 'settings_corner_radius_style';
   static const _trackListStyleKey = 'settings_track_list_style';
@@ -171,6 +173,18 @@ class SettingsStore {
   Future<void> saveNowPlayingSwipeEnabled(bool enabled) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setBool(_nowPlayingSwipeEnabledKey, enabled);
+  }
+
+  /// Loads whether swiping up expands the compact now-playing bar.
+  Future<bool> loadNowPlayingExpandGestureEnabled() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getBool(_nowPlayingExpandGestureEnabledKey) ?? true;
+  }
+
+  /// Saves whether swiping up expands the compact now-playing bar.
+  Future<void> saveNowPlayingExpandGestureEnabled(bool enabled) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_nowPlayingExpandGestureEnabledKey, enabled);
   }
 
   /// Loads whether gapless playback is enabled.

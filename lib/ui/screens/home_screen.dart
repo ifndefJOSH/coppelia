@@ -112,7 +112,9 @@ class _MainContentState extends State<_MainContent> {
         const collapseThreshold = 140.0;
         final autoCollapsed = constraints.maxWidth < autoCollapseWidth;
         final allowManual = !autoCollapsed;
-        final allowSidebarSwipe = state.sidebarSwipeEnabled;
+        final allowSidebarOpenSwipe = state.sidebarSwipeEnabled;
+        final sidebarOpenGestureWidth =
+            (72 * densityScale).clamp(56.0, 96.0).toDouble();
         final effectiveCollapsed = autoCollapsed || state.isSidebarCollapsed;
         final currentWidth = effectiveCollapsed ? 0.0 : state.sidebarWidth;
         final overlayWidth = state.sidebarWidth.clamp(220.0, 320.0);
@@ -209,24 +211,18 @@ class _MainContentState extends State<_MainContent> {
               width: overlayWidth,
               child: GestureDetector(
                 behavior: HitTestBehavior.translucent,
-                onHorizontalDragStart: allowSidebarSwipe
-                    ? (_) {
-                        _sidebarCloseDrag = 0;
-                      }
-                    : null,
-                onHorizontalDragUpdate: allowSidebarSwipe
-                    ? (details) {
-                        _sidebarCloseDrag += details.delta.dx;
-                      }
-                    : null,
-                onHorizontalDragEnd: allowSidebarSwipe
-                    ? (details) {
-                        final velocity = details.primaryVelocity ?? 0;
-                        if (velocity < -300 || _sidebarCloseDrag < -24) {
-                          _setSidebarOverlayOpen(false);
-                        }
-                      }
-                    : null,
+                onHorizontalDragStart: (_) {
+                  _sidebarCloseDrag = 0;
+                },
+                onHorizontalDragUpdate: (details) {
+                  _sidebarCloseDrag += details.delta.dx;
+                },
+                onHorizontalDragEnd: (details) {
+                  final velocity = details.primaryVelocity ?? 0;
+                  if (velocity < -300 || _sidebarCloseDrag < -24) {
+                    _setSidebarOverlayOpen(false);
+                  }
+                },
                 child: SidebarNavigation(
                   onCollapse: () => _setSidebarOverlayOpen(false),
                   onNavigate: () => _setSidebarOverlayOpen(false),
@@ -249,24 +245,18 @@ class _MainContentState extends State<_MainContent> {
                     child: GestureDetector(
                       behavior: HitTestBehavior.opaque,
                       onTap: () => _setSidebarOverlayOpen(false),
-                      onHorizontalDragStart: allowSidebarSwipe
-                          ? (_) {
-                              _sidebarCloseDrag = 0;
-                            }
-                          : null,
-                      onHorizontalDragUpdate: allowSidebarSwipe
-                          ? (details) {
-                              _sidebarCloseDrag += details.delta.dx;
-                            }
-                          : null,
-                      onHorizontalDragEnd: allowSidebarSwipe
-                          ? (details) {
-                              final velocity = details.primaryVelocity ?? 0;
-                              if (velocity < -300 || _sidebarCloseDrag < -24) {
-                                _setSidebarOverlayOpen(false);
-                              }
-                            }
-                          : null,
+                      onHorizontalDragStart: (_) {
+                        _sidebarCloseDrag = 0;
+                      },
+                      onHorizontalDragUpdate: (details) {
+                        _sidebarCloseDrag += details.delta.dx;
+                      },
+                      onHorizontalDragEnd: (details) {
+                        final velocity = details.primaryVelocity ?? 0;
+                        if (velocity < -300 || _sidebarCloseDrag < -24) {
+                          _setSidebarOverlayOpen(false);
+                        }
+                      },
                       child: Container(
                         color: Colors.black.withValues(alpha: 0.15),
                       ),
@@ -275,32 +265,26 @@ class _MainContentState extends State<_MainContent> {
                 ),
               ),
               overlayPanel,
-              if (!overlayOpen)
+              if (!overlayOpen && allowSidebarOpenSwipe)
                 Positioned(
                   top: 0,
                   bottom: 0,
                   left: 0,
-                  width: 28,
+                  width: sidebarOpenGestureWidth,
                   child: GestureDetector(
                     behavior: HitTestBehavior.translucent,
-                    onHorizontalDragStart: allowSidebarSwipe
-                        ? (_) {
-                            _sidebarOpenDrag = 0;
-                          }
-                        : null,
-                    onHorizontalDragUpdate: allowSidebarSwipe
-                        ? (details) {
-                            _sidebarOpenDrag += details.delta.dx;
-                          }
-                        : null,
-                    onHorizontalDragEnd: allowSidebarSwipe
-                        ? (details) {
-                            final velocity = details.primaryVelocity ?? 0;
-                            if (velocity > 300 || _sidebarOpenDrag > 24) {
-                              _setSidebarOverlayOpen(true);
-                            }
-                          }
-                        : null,
+                    onHorizontalDragStart: (_) {
+                      _sidebarOpenDrag = 0;
+                    },
+                    onHorizontalDragUpdate: (details) {
+                      _sidebarOpenDrag += details.delta.dx;
+                    },
+                    onHorizontalDragEnd: (details) {
+                      final velocity = details.primaryVelocity ?? 0;
+                      if (velocity > 300 || _sidebarOpenDrag > 24) {
+                        _setSidebarOverlayOpen(true);
+                      }
+                    },
                   ),
                 ),
             ],

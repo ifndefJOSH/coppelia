@@ -335,6 +335,7 @@ class AppState extends ChangeNotifier {
   KeyboardShortcut _searchShortcut = KeyboardShortcut.searchForPlatform();
   bool _sidebarSwipeEnabled = true;
   bool _nowPlayingSwipeEnabled = true;
+  bool _nowPlayingExpandGestureEnabled = true;
   bool _preferLocalSearch = false;
   LayoutDensity _layoutDensity = LayoutDensity.comfortable;
   CornerRadiusStyle _cornerRadiusStyle = CornerRadiusStyle.babyProofed;
@@ -628,11 +629,14 @@ class AppState extends ChangeNotifier {
   /// Preferred keyboard shortcut for focusing search.
   KeyboardShortcut get searchShortcut => _searchShortcut;
 
-  /// True when swiping from the edge can open or close the sidebar.
+  /// True when swiping inward from the edge can open the sidebar.
   bool get sidebarSwipeEnabled => _sidebarSwipeEnabled;
 
   /// True when swiping now-playing artwork can change tracks.
   bool get nowPlayingSwipeEnabled => _nowPlayingSwipeEnabled;
+
+  /// True when swiping up expands the compact now-playing player.
+  bool get nowPlayingExpandGestureEnabled => _nowPlayingExpandGestureEnabled;
 
   /// True when local search should be used even when online.
   bool get preferLocalSearch => _preferLocalSearch;

@@ -177,7 +177,7 @@ extension AppStatePreferencesExtension on AppState {
     );
   }
 
-  /// Updates whether sidebar edge swipes are enabled.
+  /// Updates whether an inward edge swipe can open the sidebar.
   Future<void> setSidebarSwipeEnabled(bool enabled) async {
     await _savePreference(
       apply: () => _sidebarSwipeEnabled = enabled,
@@ -190,6 +190,14 @@ extension AppStatePreferencesExtension on AppState {
     await _savePreference(
       apply: () => _nowPlayingSwipeEnabled = enabled,
       persist: () => _settingsStore.saveNowPlayingSwipeEnabled(enabled),
+    );
+  }
+
+  /// Updates whether an upward swipe expands the compact now-playing player.
+  Future<void> setNowPlayingExpandGestureEnabled(bool enabled) async {
+    await _savePreference(
+      apply: () => _nowPlayingExpandGestureEnabled = enabled,
+      persist: () => _settingsStore.saveNowPlayingExpandGestureEnabled(enabled),
     );
   }
 

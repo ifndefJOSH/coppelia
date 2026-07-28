@@ -863,8 +863,19 @@ class _LayoutSettings extends StatelessWidget {
         ),
         SizedBox(height: space(12)),
         _SettingRow(
+          title: 'Swipe up to expand Now Playing',
+          subtitle: 'Swipe up from the compact player to open the full player.',
+          forceInline: true,
+          trailing: CompactSwitch(
+            value: state.nowPlayingExpandGestureEnabled,
+            onChanged: state.setNowPlayingExpandGestureEnabled,
+          ),
+        ),
+        SizedBox(height: space(12)),
+        _SettingRow(
           title: 'Swipe to open sidebar',
-          subtitle: 'Swipe from the screen edge to open or close the sidebar.',
+          subtitle:
+              'Swipe inward from near the screen edge to open the sidebar.',
           forceInline: true,
           trailing: CompactSwitch(
             value: state.sidebarSwipeEnabled,

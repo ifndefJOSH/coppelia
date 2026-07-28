@@ -466,7 +466,7 @@ class _BottomBar extends StatelessWidget {
         ),
       ),
     );
-    if (!isTouch || track == null) {
+    if (!isTouch || track == null || !state.nowPlayingExpandGestureEnabled) {
       return panel;
     }
     return GestureDetector(
