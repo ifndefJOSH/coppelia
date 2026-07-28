@@ -56,6 +56,12 @@ class SettingsStore {
   static const _settingsShortcutKey = 'settings_shortcut_settings';
   static const _searchShortcutEnabledKey = 'settings_shortcut_search_enabled';
   static const _searchShortcutKey = 'settings_shortcut_search';
+  static const _sidebarSwipeEnabledKey =
+      'settings_gesture_sidebar_swipe_enabled';
+  static const _nowPlayingSwipeEnabledKey =
+      'settings_gesture_now_playing_swipe_enabled';
+  static const _nowPlayingExpandGestureEnabledKey =
+      'settings_gesture_now_playing_expand_enabled';
   static const _layoutDensityKey = 'settings_layout_density';
   static const _cornerRadiusStyleKey = 'settings_corner_radius_style';
   static const _trackListStyleKey = 'settings_track_list_style';
@@ -143,6 +149,42 @@ class SettingsStore {
   Future<void> saveSearchShortcut(KeyboardShortcut shortcut) async {
     final preferences = await SharedPreferences.getInstance();
     await preferences.setString(_searchShortcutKey, shortcut.serialize());
+  }
+
+  /// Loads whether the sidebar edge-swipe gesture is enabled.
+  Future<bool> loadSidebarSwipeEnabled() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getBool(_sidebarSwipeEnabledKey) ?? true;
+  }
+
+  /// Saves whether the sidebar edge-swipe gesture is enabled.
+  Future<void> saveSidebarSwipeEnabled(bool enabled) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_sidebarSwipeEnabledKey, enabled);
+  }
+
+  /// Loads whether now-playing track swipes are enabled.
+  Future<bool> loadNowPlayingSwipeEnabled() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getBool(_nowPlayingSwipeEnabledKey) ?? true;
+  }
+
+  /// Saves whether now-playing track swipes are enabled.
+  Future<void> saveNowPlayingSwipeEnabled(bool enabled) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_nowPlayingSwipeEnabledKey, enabled);
+  }
+
+  /// Loads whether swiping up expands the compact now-playing bar.
+  Future<bool> loadNowPlayingExpandGestureEnabled() async {
+    final preferences = await SharedPreferences.getInstance();
+    return preferences.getBool(_nowPlayingExpandGestureEnabledKey) ?? true;
+  }
+
+  /// Saves whether swiping up expands the compact now-playing bar.
+  Future<void> saveNowPlayingExpandGestureEnabled(bool enabled) async {
+    final preferences = await SharedPreferences.getInstance();
+    await preferences.setBool(_nowPlayingExpandGestureEnabledKey, enabled);
   }
 
   /// Loads whether gapless playback is enabled.

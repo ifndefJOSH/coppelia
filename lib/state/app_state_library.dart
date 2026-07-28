@@ -1484,6 +1484,19 @@ extension AppStateLibraryExtension on AppState {
       _albumTracks = cached;
       _notify();
     }
+    if (cached.isEmpty && !_offlineMode) {
+      // Album summaries are cached separately from the library track snapshot.
+      // Use that snapshot immediately when the server is unavailable so the
+      // detail page remains playable while the refresh runs.
+      if (_libraryTracks.isEmpty) {
+        await _loadCachedLibraryTrackSnapshot();
+      }
+      final localTracks = _cachedLibraryTracksForAlbum(album);
+      if (localTracks.isNotEmpty) {
+        _albumTracks = localTracks;
+        _notify();
+      }
+    }
     if (_offlineMode) {
       final filtered = _filterPinnedTracks(_albumTracks);
       if (filtered.isNotEmpty) {
@@ -1503,12 +1516,52 @@ extension AppStateLibraryExtension on AppState {
       if (_selectedAlbum?.id != album.id) {
         return;
       }
-      _albumTracks = tracks;
+      // An empty refresh must not erase tracks recovered from the local
+      // library snapshot while the server is unreachable or still indexing.
+      if (tracks.isNotEmpty || _albumTracks.isEmpty) {
+        _albumTracks = tracks;
+      }
       _notify();
-      await _cacheStore.saveAlbumTracks(album.id, tracks);
-    } catch (_) {
-      // Keep cached tracks if refresh fails.
+      if (tracks.isNotEmpty) {
+        await _cacheStore.saveAlbumTracks(album.id, tracks);
+      }
+    } catch (error, stackTrace) {
+      await LogService.instance.then(
+        (log) => log.error(
+          'selectAlbum: Failed to refresh album tracks',
+          error,
+          stackTrace,
+        ),
+      );
+      // Keep cached or locally recovered tracks if refresh fails.
     }
+  }
+
+  List<MediaItem> _cachedLibraryTracksForAlbum(Album album) {
+    final idMatches =
+        _libraryTracks.where((track) => track.albumId == album.id).toList();
+    if (idMatches.isNotEmpty) {
+      return idMatches;
+    }
+
+    final normalizedAlbum = album.name.trim().toLowerCase();
+    final titleMatches = _libraryTracks
+        .where((track) => track.album.trim().toLowerCase() == normalizedAlbum)
+        .toList();
+    if (titleMatches.isEmpty) {
+      return const [];
+    }
+
+    final normalizedArtist = album.artistName.trim().toLowerCase();
+    if (normalizedArtist.isEmpty || normalizedArtist == 'unknown artist') {
+      return titleMatches;
+    }
+    final artistMatches = titleMatches.where((track) {
+      return track.artists.any(
+        (artist) => artist.trim().toLowerCase() == normalizedArtist,
+      );
+    }).toList();
+    return artistMatches.isNotEmpty ? artistMatches : titleMatches;
   }
 
   /// Loads an album and starts playback.

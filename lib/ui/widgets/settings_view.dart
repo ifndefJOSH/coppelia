@@ -849,6 +849,39 @@ class _LayoutSettings extends StatelessWidget {
             ),
           ],
         ),
+        Divider(height: space(32), color: ColorTokens.border(context, 0.12)),
+        Text('Gestures', style: Theme.of(context).textTheme.titleLarge),
+        SizedBox(height: space(12)),
+        _SettingRow(
+          title: 'Swipe to change tracks',
+          subtitle: 'Swipe the Now Playing artwork to move between tracks.',
+          forceInline: true,
+          trailing: CompactSwitch(
+            value: state.nowPlayingSwipeEnabled,
+            onChanged: state.setNowPlayingSwipeEnabled,
+          ),
+        ),
+        SizedBox(height: space(12)),
+        _SettingRow(
+          title: 'Swipe up to expand Now Playing',
+          subtitle: 'Swipe up from the compact player to open the full player.',
+          forceInline: true,
+          trailing: CompactSwitch(
+            value: state.nowPlayingExpandGestureEnabled,
+            onChanged: state.setNowPlayingExpandGestureEnabled,
+          ),
+        ),
+        SizedBox(height: space(12)),
+        _SettingRow(
+          title: 'Swipe to open sidebar',
+          subtitle:
+              'Swipe inward from near the screen edge to open the sidebar.',
+          forceInline: true,
+          trailing: CompactSwitch(
+            value: state.sidebarSwipeEnabled,
+            onChanged: state.setSidebarSwipeEnabled,
+          ),
+        ),
       ],
     );
   }
@@ -2560,6 +2593,7 @@ class _SettingRow extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isNarrow = constraints.maxWidth < 520;
+        final mustStack = constraints.maxWidth < 420;
         final textBlock = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -2574,7 +2608,7 @@ class _SettingRow extends StatelessWidget {
             ),
           ],
         );
-        if (isNarrow && !forceInline) {
+        if (mustStack || (isNarrow && !forceInline)) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

@@ -40,6 +40,10 @@ extension AppStateSessionExtension on AppState {
     _settingsShortcut = await _settingsStore.loadSettingsShortcut();
     _searchShortcutEnabled = await _settingsStore.loadSearchShortcutEnabled();
     _searchShortcut = await _settingsStore.loadSearchShortcut();
+    _sidebarSwipeEnabled = await _settingsStore.loadSidebarSwipeEnabled();
+    _nowPlayingSwipeEnabled = await _settingsStore.loadNowPlayingSwipeEnabled();
+    _nowPlayingExpandGestureEnabled =
+        await _settingsStore.loadNowPlayingExpandGestureEnabled();
     _preferLocalSearch = await _settingsStore.loadPreferLocalSearch();
     _layoutDensity = await _settingsStore.loadLayoutDensity();
     _cornerRadiusStyle = await _settingsStore.loadCornerRadiusStyle();

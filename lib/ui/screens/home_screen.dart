@@ -51,9 +51,26 @@ class HomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
-    return Scaffold(
-      body: GradientBackground(
-        child: _MainContent(state: state),
+    final handlesBack =
+        state.isSidebarOverlayOpen || state.isSearching || state.canGoBack;
+    return PopScope(
+      canPop: !handlesBack,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) {
+          return;
+        }
+        if (state.isSidebarOverlayOpen) {
+          state.setSidebarOverlayOpen(false);
+          return;
+        }
+        if (state.isSearching || state.canGoBack) {
+          state.goBack();
+        }
+      },
+      child: Scaffold(
+        body: GradientBackground(
+          child: _MainContent(state: state),
+        ),
       ),
     );
   }
@@ -95,6 +112,9 @@ class _MainContentState extends State<_MainContent> {
         const collapseThreshold = 140.0;
         final autoCollapsed = constraints.maxWidth < autoCollapseWidth;
         final allowManual = !autoCollapsed;
+        final allowSidebarOpenSwipe = state.sidebarSwipeEnabled;
+        final sidebarOpenGestureWidth =
+            (72 * densityScale).clamp(56.0, 96.0).toDouble();
         final effectiveCollapsed = autoCollapsed || state.isSidebarCollapsed;
         final currentWidth = effectiveCollapsed ? 0.0 : state.sidebarWidth;
         final overlayWidth = state.sidebarWidth.clamp(220.0, 320.0);
@@ -245,12 +265,12 @@ class _MainContentState extends State<_MainContent> {
                 ),
               ),
               overlayPanel,
-              if (!overlayOpen)
+              if (!overlayOpen && allowSidebarOpenSwipe)
                 Positioned(
                   top: 0,
                   bottom: 0,
                   left: 0,
-                  width: 28,
+                  width: sidebarOpenGestureWidth,
                   child: GestureDetector(
                     behavior: HitTestBehavior.translucent,
                     onHorizontalDragStart: (_) {
