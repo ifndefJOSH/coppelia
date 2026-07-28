@@ -34,15 +34,22 @@ class _MockSessionStore extends Mock implements SessionStore {}
 
 class _MockSettingsStore extends Mock implements SettingsStore {}
 
-MediaItem _track(String id, {String? title}) {
+MediaItem _track(
+  String id, {
+  String? title,
+  String album = 'Album',
+  String? albumId,
+  List<String> artists = const ['Artist'],
+}) {
   return MediaItem(
     id: id,
     title: title ?? 'Track $id',
-    album: 'Album',
-    artists: const ['Artist'],
+    album: album,
+    artists: artists,
     duration: const Duration(minutes: 3),
     imageUrl: null,
     streamUrl: 'https://example.com/audio/$id.mp3',
+    albumId: albumId,
   );
 }
 
@@ -645,6 +652,43 @@ void main() {
 
       expect(state.selectedAlbum, secondAlbum);
       expect(state.albumTracks, secondTracks);
+    });
+
+    test('selectAlbum uses the cached library snapshot when refresh fails',
+        () async {
+      final cacheStore = _MockCacheStore();
+      final client = _MockJellyfinClient();
+      final playback = _MockPlaybackController();
+      final sessionStore = _MockSessionStore();
+      final settingsStore = _MockSettingsStore();
+      final state = buildState(
+        cacheStore: cacheStore,
+        client: client,
+        playback: playback,
+        sessionStore: sessionStore,
+        settingsStore: settingsStore,
+      );
+      addTearDown(state.dispose);
+
+      final album = _album('target');
+      final cachedTrack = _track(
+        'cached-track',
+        album: album.name,
+        albumId: album.id,
+      );
+      when(
+        () => cacheStore.loadAlbumTracks(album.id),
+      ).thenAnswer((_) async => const <MediaItem>[]);
+      when(
+        () => cacheStore.loadLibraryTracks(),
+      ).thenAnswer((_) async => [cachedTrack]);
+      when(
+        () => client.fetchAlbumTracks(album.id),
+      ).thenThrow(StateError('server unavailable'));
+
+      await state.selectAlbum(album);
+
+      expect(state.albumTracks, [cachedTrack]);
     });
   });
 

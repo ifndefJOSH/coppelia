@@ -109,4 +109,104 @@ void main() {
     expect(headers, isNot(contains('X-Emby-Authorization')));
     expect(headers, isNot(contains('X-Emby-Token')));
   });
+
+  test('fetchAlbumTracks filters by album id and keeps a parent fallback',
+      () async {
+    final client = _MockHttpClient();
+    final jellyfin = JellyfinClient(httpClient: client);
+    jellyfin.updateSession(
+      const AuthSession(
+        accessToken: 'token',
+        serverUrl: 'https://demo.jellyfin.org',
+        userId: 'user-1',
+        userName: 'Jordan',
+      ),
+    );
+
+    when(
+      () => client.get(
+        any(),
+        headers: any(named: 'headers'),
+      ),
+    ).thenAnswer(
+      (_) async => http.Response(
+        jsonEncode({
+          'Items': [
+            {
+              'Id': 'track-1',
+              'Name': 'Track 1',
+              'Album': 'Morning Focus',
+              'Artists': ['Jordan'],
+              'RunTimeTicks': 1800000000,
+              'Container': 'mp3',
+            }
+          ]
+        }),
+        200,
+      ),
+    );
+
+    final tracks = await jellyfin.fetchAlbumTracks('album-1');
+
+    expect(tracks, hasLength(1));
+    expect(tracks.single.title, 'Track 1');
+    expect(tracks.single.container, 'mp3');
+
+    final firstUri = verify(
+      () => client.get(
+        captureAny(),
+        headers: any(named: 'headers'),
+      ),
+    ).captured.single as Uri;
+    expect(firstUri.queryParameters['AlbumIds'], 'album-1');
+    expect(firstUri.queryParameters['ParentId'], isNull);
+    expect(firstUri.queryParameters['Fields'], isNot(contains('Container')));
+  });
+
+  test('fetchAlbumTracks falls back to parent filtering when needed', () async {
+    final client = _MockHttpClient();
+    final jellyfin = JellyfinClient(httpClient: client);
+    jellyfin.updateSession(
+      const AuthSession(
+        accessToken: 'token',
+        serverUrl: 'https://demo.jellyfin.org',
+        userId: 'user-1',
+        userName: 'Jordan',
+      ),
+    );
+
+    var requestCount = 0;
+    when(
+      () => client.get(
+        any(),
+        headers: any(named: 'headers'),
+      ),
+    ).thenAnswer((invocation) async {
+      requestCount += 1;
+      final uri = invocation.positionalArguments.first as Uri;
+      if (uri.queryParameters['AlbumIds'] != null) {
+        return http.Response(jsonEncode({'Items': []}), 200);
+      }
+      return http.Response(
+        jsonEncode({
+          'Items': [
+            {
+              'Id': 'track-1',
+              'Name': 'Track 1',
+              'Album': 'Morning Focus',
+              'Artists': ['Jordan'],
+              'RunTimeTicks': 1800000000,
+            }
+          ]
+        }),
+        200,
+      );
+    });
+
+    final tracks = await jellyfin.fetchAlbumTracks('album-1');
+
+    expect(requestCount, 2);
+    expect(tracks, hasLength(1));
+    expect(tracks.single.id, 'track-1');
+  });
 }
