@@ -163,6 +163,25 @@ void main() {
     expect(await store.loadDownloadsWifiOnly(), isTrue);
   });
 
+  test('settings store defaults gesture toggles to enabled', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = SettingsStore();
+
+    expect(await store.loadSidebarSwipeEnabled(), isTrue);
+    expect(await store.loadNowPlayingSwipeEnabled(), isTrue);
+  });
+
+  test('settings store saves gesture toggles', () async {
+    SharedPreferences.setMockInitialValues({});
+    final store = SettingsStore();
+
+    await store.saveSidebarSwipeEnabled(false);
+    await store.saveNowPlayingSwipeEnabled(false);
+
+    expect(await store.loadSidebarSwipeEnabled(), isFalse);
+    expect(await store.loadNowPlayingSwipeEnabled(), isFalse);
+  });
+
   test('settings store defaults downloads to unpaused', () async {
     SharedPreferences.setMockInitialValues({});
     final store = SettingsStore();

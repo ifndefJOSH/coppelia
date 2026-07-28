@@ -849,6 +849,28 @@ class _LayoutSettings extends StatelessWidget {
             ),
           ],
         ),
+        Divider(height: space(32), color: ColorTokens.border(context, 0.12)),
+        Text('Gestures', style: Theme.of(context).textTheme.titleLarge),
+        SizedBox(height: space(12)),
+        _SettingRow(
+          title: 'Swipe to change tracks',
+          subtitle: 'Swipe the Now Playing artwork to move between tracks.',
+          forceInline: true,
+          trailing: CompactSwitch(
+            value: state.nowPlayingSwipeEnabled,
+            onChanged: state.setNowPlayingSwipeEnabled,
+          ),
+        ),
+        SizedBox(height: space(12)),
+        _SettingRow(
+          title: 'Swipe to open sidebar',
+          subtitle: 'Swipe from the screen edge to open or close the sidebar.',
+          forceInline: true,
+          trailing: CompactSwitch(
+            value: state.sidebarSwipeEnabled,
+            onChanged: state.setSidebarSwipeEnabled,
+          ),
+        ),
       ],
     );
   }

@@ -177,6 +177,22 @@ extension AppStatePreferencesExtension on AppState {
     );
   }
 
+  /// Updates whether sidebar edge swipes are enabled.
+  Future<void> setSidebarSwipeEnabled(bool enabled) async {
+    await _savePreference(
+      apply: () => _sidebarSwipeEnabled = enabled,
+      persist: () => _settingsStore.saveSidebarSwipeEnabled(enabled),
+    );
+  }
+
+  /// Updates whether now-playing track swipes are enabled.
+  Future<void> setNowPlayingSwipeEnabled(bool enabled) async {
+    await _savePreference(
+      apply: () => _nowPlayingSwipeEnabled = enabled,
+      persist: () => _settingsStore.saveNowPlayingSwipeEnabled(enabled),
+    );
+  }
+
   /// Updates the prefer local search preference.
   Future<void> setPreferLocalSearch(bool enabled) async {
     await _savePreference(

@@ -138,7 +138,7 @@ class _SidePanelState extends State<_SidePanel> {
             next: neighbors.next,
             onNext: state.nextTrack,
             onPrevious: state.previousTrack,
-            enabled: isTouch && track != null,
+            enabled: isTouch && track != null && state.nowPlayingSwipeEnabled,
             onTap:
                 track == null ? null : () => _openExpandedNowPlaying(context),
             onContextMenu: track == null
@@ -317,7 +317,9 @@ class _BottomBar extends StatelessWidget {
                     next: neighbors.next,
                     onNext: state.nextTrack,
                     onPrevious: state.previousTrack,
-                    enabled: isTouch && track != null,
+                    enabled: isTouch &&
+                        track != null &&
+                        state.nowPlayingSwipeEnabled,
                     onTap: track == null
                         ? null
                         : () => _openExpandedNowPlaying(context),
@@ -389,7 +391,9 @@ class _BottomBar extends StatelessWidget {
                         next: neighbors.next,
                         onNext: state.nextTrack,
                         onPrevious: state.previousTrack,
-                        enabled: isTouch && track != null,
+                        enabled: isTouch &&
+                            track != null &&
+                            state.nowPlayingSwipeEnabled,
                         onTap: track == null
                             ? null
                             : () => _openExpandedNowPlaying(context),
@@ -1343,7 +1347,9 @@ class _NowPlayingExpandedView extends StatelessWidget {
                     next: neighbors.next,
                     onNext: state.nextTrack,
                     onPrevious: state.previousTrack,
-                    enabled: isTouch && track != null,
+                    enabled: isTouch &&
+                        track != null &&
+                        state.nowPlayingSwipeEnabled,
                     onContextMenu: track == null
                         ? null
                         : (position) => _showNowPlayingTrackMenu(
