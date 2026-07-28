@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:http/http.dart' as http;
@@ -25,15 +26,21 @@ class JellyfinClient {
   /// Client name for Jellyfin analytics.
   static const String clientName = 'Coppelia';
 
+  /// A playlist mutation should not leave its caller waiting indefinitely.
+  static const Duration _defaultPlaylistRequestTimeout = Duration(seconds: 8);
+
   /// Client version for Jellyfin analytics.
   String get clientVersion => AppInfo.version;
 
   /// Creates a client with an optional HTTP override.
   JellyfinClient({
     http.Client? httpClient,
-  }) : _httpClient = httpClient ?? http.Client();
+    Duration playlistRequestTimeout = _defaultPlaylistRequestTimeout,
+  })  : _httpClient = httpClient ?? http.Client(),
+        _playlistRequestTimeout = playlistRequestTimeout;
 
   final http.Client _httpClient;
+  final Duration _playlistRequestTimeout;
 
   AuthSession? _session;
   String _deviceId = defaultDeviceId;
@@ -414,41 +421,61 @@ class JellyfinClient {
       return;
     }
     final session = _requireSession();
-    final headers = _playlistHeaders(session);
     final uri = Uri.parse(
       '${session.serverUrl}/Playlists/$playlistId/Items',
     ).replace(
       queryParameters: {
-        'Ids': itemIds.join(','),
-        'UserId': session.userId,
+        'ids': itemIds.join(','),
+        'userId': session.userId,
       },
     );
-    final response = await _httpClient.post(
-      uri,
-      headers: headers,
-      body: jsonEncode(<String, dynamic>{}),
+    final logService = await LogService.instance;
+    await logService.info(
+      'JellyfinClient: Adding ${itemIds.length} item(s) to playlist '
+      '$playlistId',
+    );
+    final abortCompleter = Completer<void>();
+    final timeout = Timer(_playlistRequestTimeout, abortCompleter.complete);
+    late http.Response response;
+    try {
+      final request = http.AbortableRequest(
+        'POST',
+        uri,
+        abortTrigger: abortCompleter.future,
+      )..headers.addAll(_authenticatedHeaders(session));
+      response =
+          await http.Response.fromStream(await _httpClient.send(request));
+    } on http.RequestAbortedException catch (error, stackTrace) {
+      await logService.error(
+        'JellyfinClient: Add-to-playlist request timed out',
+        error,
+        stackTrace,
+      );
+      throw JellyfinRequestException(
+        'Adding this track to the playlist timed out. Please try again.',
+      );
+    } on Object catch (error, stackTrace) {
+      await logService.error(
+        'JellyfinClient: Add-to-playlist request failed',
+        error,
+        stackTrace,
+      );
+      throw JellyfinRequestException('Unable to add to playlist.');
+    } finally {
+      timeout.cancel();
+    }
+    await logService.info(
+      'JellyfinClient: Add-to-playlist response ${response.statusCode}',
     );
     if (response.statusCode >= 200 && response.statusCode < 300) {
       return;
     }
-    final fallbackResponse = await _httpClient.post(
-      Uri.parse('${session.serverUrl}/Playlists/$playlistId/Items').replace(
-        queryParameters: {
-          'UserId': session.userId,
-        },
+    throw JellyfinRequestException(
+      _errorMessage(
+        response,
+        fallback: 'Unable to add to playlist.',
       ),
-      headers: headers,
-      body: jsonEncode({'Ids': itemIds}),
     );
-    if (fallbackResponse.statusCode < 200 ||
-        fallbackResponse.statusCode >= 300) {
-      throw JellyfinRequestException(
-        _errorMessage(
-          fallbackResponse,
-          fallback: 'Unable to add to playlist.',
-        ),
-      );
-    }
   }
 
   /// Removes items from a playlist.

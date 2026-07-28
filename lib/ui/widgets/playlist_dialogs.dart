@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../models/media_item.dart';
 import '../../models/playlist.dart';
 import '../../state/app_state.dart';
+import 'app_snack.dart';
 
 /// Result from a playlist picker dialog.
 class PlaylistPickerResult {
@@ -18,6 +19,33 @@ class PlaylistPickerResult {
 
   /// Indicates if the playlist was newly created.
   final bool isNew;
+}
+
+/// Lets the user choose a playlist, then confirms a successful track addition.
+Future<void> addTrackToPlaylistFromPicker(
+  BuildContext context,
+  MediaItem track,
+) async {
+  final state = context.read<AppState>();
+  final result = await showPlaylistPickerDialog(
+    context,
+    initialTracks: [track],
+  );
+  if (result == null || !context.mounted) {
+    return;
+  }
+
+  final successMessage = 'Added "${track.title}" to "${result.playlist.name}".';
+  if (result.isNew) {
+    showAppSnack(context, successMessage);
+    return;
+  }
+
+  await runWithSnack(
+    context,
+    () => state.addTrackToPlaylist(track, result.playlist),
+    successMessage: successMessage,
+  );
 }
 
 /// Prompts for a playlist name.
