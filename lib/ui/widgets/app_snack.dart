@@ -2,7 +2,15 @@ import 'package:flutter/material.dart';
 
 /// Shows a standard snack bar message.
 void showAppSnack(BuildContext context, String message) {
-  ScaffoldMessenger.of(context).showSnackBar(
+  final messenger = ScaffoldMessenger.maybeOf(context);
+  if (messenger == null) {
+    return;
+  }
+  _showSnack(messenger, message);
+}
+
+void _showSnack(ScaffoldMessengerState messenger, String message) {
+  messenger.showSnackBar(
     SnackBar(content: Text(message)),
   );
 }
@@ -13,13 +21,16 @@ Future<void> runWithSnack(
   Future<String?> Function() action, {
   String? successMessage,
 }) async {
+  // Keep the messenger alive if the initiating widget rebuilds or is removed
+  // while the request is in flight.
+  final messenger = ScaffoldMessenger.maybeOf(context);
   final error = await action();
-  if (!context.mounted) {
+  if (messenger == null || !messenger.mounted) {
     return;
   }
   if (error != null) {
-    showAppSnack(context, error);
+    _showSnack(messenger, error);
   } else if (successMessage != null) {
-    showAppSnack(context, successMessage);
+    _showSnack(messenger, successMessage);
   }
 }

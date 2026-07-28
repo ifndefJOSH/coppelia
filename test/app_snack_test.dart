@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:coppelia/ui/widgets/app_snack.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -44,6 +46,52 @@ void main() {
     expect(
       find.text('Added "The Track" to "Favorites".'),
       findsNothing,
+    );
+  });
+
+  testWidgets('runWithSnack survives the source widget being removed', (
+    tester,
+  ) async {
+    final action = Completer<String?>();
+    var showSource = true;
+    late BuildContext sourceContext;
+    late StateSetter setSourceState;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StatefulBuilder(
+            builder: (context, setState) {
+              setSourceState = setState;
+              if (!showSource) {
+                return const SizedBox();
+              }
+              return Builder(
+                builder: (context) {
+                  sourceContext = context;
+                  return const SizedBox();
+                },
+              );
+            },
+          ),
+        ),
+      ),
+    );
+
+    final future = runWithSnack(
+      sourceContext,
+      () => action.future,
+      successMessage: 'Added "The Track" to "Favorites".',
+    );
+    setSourceState(() => showSource = false);
+    await tester.pump();
+    action.complete(null);
+    await future;
+    await tester.pump();
+
+    expect(
+      find.text('Added "The Track" to "Favorites".'),
+      findsOneWidget,
     );
   });
 }

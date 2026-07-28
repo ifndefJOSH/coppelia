@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter_test/flutter_test.dart';
@@ -12,6 +13,9 @@ class _MockHttpClient extends Mock implements http.Client {}
 void main() {
   setUpAll(() {
     registerFallbackValue(Uri.parse('https://example.com'));
+    registerFallbackValue(
+      http.Request('POST', Uri.parse('https://example.com')),
+    );
   });
 
   test('authenticate builds an auth session', () async {
@@ -108,6 +112,76 @@ void main() {
     expect(headers['Authorization'], contains('Token="token"'));
     expect(headers, isNot(contains('X-Emby-Authorization')));
     expect(headers, isNot(contains('X-Emby-Token')));
+  });
+
+  test('addToPlaylist uses the current Jellyfin query API', () async {
+    final client = _MockHttpClient();
+    final jellyfin = JellyfinClient(httpClient: client);
+    jellyfin.updateSession(
+      const AuthSession(
+        accessToken: 'token',
+        serverUrl: 'https://demo.jellyfin.org',
+        userId: 'user-1',
+        userName: 'Jordan',
+      ),
+    );
+    when(
+      () => client.send(any()),
+    ).thenAnswer((_) async => http.StreamedResponse(Stream.value([]), 204));
+
+    await jellyfin.addToPlaylist(
+      playlistId: 'playlist-1',
+      itemIds: ['track-1', 'track-2'],
+    );
+
+    final captured = verify(
+      () => client.send(captureAny()),
+    ).captured;
+    final request = captured.single as http.BaseRequest;
+    final uri = request.url;
+    final headers = request.headers;
+    expect(uri.path, '/Playlists/playlist-1/Items');
+    expect(uri.queryParameters['ids'], 'track-1,track-2');
+    expect(uri.queryParameters['userId'], 'user-1');
+    expect(headers['Authorization'], contains('Token="token"'));
+    expect(headers, isNot(contains('Content-Type')));
+  });
+
+  test('addToPlaylist aborts a stalled request', () async {
+    final client = _MockHttpClient();
+    final jellyfin = JellyfinClient(
+      httpClient: client,
+      playlistRequestTimeout: Duration.zero,
+    );
+    jellyfin.updateSession(
+      const AuthSession(
+        accessToken: 'token',
+        serverUrl: 'https://demo.jellyfin.org',
+        userId: 'user-1',
+        userName: 'Jordan',
+      ),
+    );
+    when(() => client.send(any())).thenAnswer((invocation) {
+      final request =
+          invocation.positionalArguments.single as http.AbortableRequest;
+      return request.abortTrigger!.then<http.StreamedResponse>((_) {
+        throw http.RequestAbortedException(request.url);
+      });
+    });
+
+    await expectLater(
+      jellyfin.addToPlaylist(
+        playlistId: 'playlist-1',
+        itemIds: ['track-1'],
+      ),
+      throwsA(
+        isA<JellyfinRequestException>().having(
+          (error) => error.message,
+          'message',
+          contains('timed out'),
+        ),
+      ),
+    );
   });
 
   test('fetchAlbumTracks filters by album id and keeps a parent fallback',
