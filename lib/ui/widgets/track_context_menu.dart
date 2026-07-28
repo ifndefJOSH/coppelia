@@ -144,25 +144,7 @@ Future<void> showTrackContextMenu({
   } else if (action == _TrackMenuAction.addToQueue) {
     onAddToQueue?.call();
   } else if (action == _TrackMenuAction.addToPlaylist) {
-    final result = await showPlaylistPickerDialog(
-      context,
-      initialTracks: [track],
-    );
-    if (!context.mounted) {
-      return;
-    }
-    if (result == null) {
-      return;
-    }
-    if (!result.isNew) {
-      if (!context.mounted) {
-        return;
-      }
-      await runWithSnack(
-        context,
-        () => state.addTrackToPlaylist(track, result.playlist),
-      );
-    }
+    await addTrackToPlaylistFromPicker(context, track);
   } else if (action == _TrackMenuAction.favorite) {
     if (onToggleFavorite != null) {
       if (!context.mounted) {

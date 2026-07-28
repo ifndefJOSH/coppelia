@@ -7,13 +7,19 @@ void showAppSnack(BuildContext context, String message) {
   );
 }
 
-/// Runs an async action and shows any error message in a snack bar.
+/// Runs an async action and shows an error or optional success message.
 Future<void> runWithSnack(
   BuildContext context,
-  Future<String?> Function() action,
-) async {
+  Future<String?> Function() action, {
+  String? successMessage,
+}) async {
   final error = await action();
-  if (error != null && context.mounted) {
+  if (!context.mounted) {
+    return;
+  }
+  if (error != null) {
     showAppSnack(context, error);
+  } else if (successMessage != null) {
+    showAppSnack(context, successMessage);
   }
 }
