@@ -1,0 +1,5 @@
+What's new in 0.1.1
+
+* Customize gesture controls for navigation and Now Playing.
+* Improve narrow-screen navigation and Now Playing layouts.
+* Fix adding tracks to playlists and album listing behavior.
