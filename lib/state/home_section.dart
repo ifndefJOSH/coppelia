@@ -3,6 +3,9 @@ enum HomeSection {
   /// Featured tracks shelf.
   featured,
 
+  /// Albums most recently added to the Jellyfin library.
+  recentlyAddedAlbums,
+
   /// Recently played shelf.
   recent,
 
@@ -22,6 +25,8 @@ extension HomeSectionMetadata on HomeSection {
     switch (this) {
       case HomeSection.featured:
         return 'featured';
+      case HomeSection.recentlyAddedAlbums:
+        return 'recentlyAddedAlbums';
       case HomeSection.recent:
         return 'recent';
       case HomeSection.playlists:
@@ -38,6 +43,8 @@ extension HomeSectionMetadata on HomeSection {
     switch (this) {
       case HomeSection.featured:
         return 'Featured';
+      case HomeSection.recentlyAddedAlbums:
+        return 'Recently added albums';
       case HomeSection.recent:
         return 'Recently played';
       case HomeSection.playlists:
@@ -54,6 +61,8 @@ extension HomeSectionMetadata on HomeSection {
     switch (this) {
       case HomeSection.featured:
         return 'Show the curated track shelf.';
+      case HomeSection.recentlyAddedAlbums:
+        return 'Show albums most recently added to your library.';
       case HomeSection.recent:
         return 'Show your recently played shelf.';
       case HomeSection.playlists:

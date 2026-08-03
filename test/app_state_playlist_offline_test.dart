@@ -248,6 +248,10 @@ void main() {
         .thenAnswer((_) async => const <MediaItem>[]);
     when(() => cacheStore.saveRecentTracks(any())).thenAnswer((_) async {});
     when(() => cacheStore.saveFeaturedTracks(any())).thenAnswer((_) async {});
+    when(() => client.fetchRecentlyAddedAlbums())
+        .thenAnswer((_) async => const <Album>[]);
+    when(() => cacheStore.saveRecentlyAddedAlbums(any()))
+        .thenAnswer((_) async {});
     when(() => client.fetchAlbums()).thenAnswer((_) async => const <Album>[]);
     when(() => cacheStore.saveAlbums(any())).thenAnswer((_) async {});
     when(() => client.fetchArtists()).thenAnswer((_) async => const <Artist>[]);
@@ -266,6 +270,73 @@ void main() {
   }
 
   group('AppState session', () {
+    test('signIn loads and caches recently added albums', () async {
+      final cacheStore = _MockCacheStore();
+      final client = _MockJellyfinClient();
+      final playback = _MockPlaybackController();
+      final sessionStore = _MockSessionStore();
+      final settingsStore = _MockSettingsStore();
+      final state = buildState(
+        cacheStore: cacheStore,
+        client: client,
+        playback: playback,
+        sessionStore: sessionStore,
+        settingsStore: settingsStore,
+      );
+      addTearDown(state.dispose);
+      stubSignedInRefresh(
+        cacheStore: cacheStore,
+        client: client,
+        sessionStore: sessionStore,
+      );
+      final albums = [_album('new')];
+      when(() => client.fetchRecentlyAddedAlbums())
+          .thenAnswer((_) async => albums);
+
+      final signedIn = await state.signIn(
+        serverUrl: 'https://example.com',
+        username: 'user',
+        password: 'password',
+      );
+
+      expect(signedIn, isTrue);
+      expect(state.recentlyAddedAlbums, albums);
+      verify(() => cacheStore.saveRecentlyAddedAlbums(albums)).called(1);
+    });
+
+    test('signIn succeeds when the optional recent album shelf fails',
+        () async {
+      final cacheStore = _MockCacheStore();
+      final client = _MockJellyfinClient();
+      final playback = _MockPlaybackController();
+      final sessionStore = _MockSessionStore();
+      final settingsStore = _MockSettingsStore();
+      final state = buildState(
+        cacheStore: cacheStore,
+        client: client,
+        playback: playback,
+        sessionStore: sessionStore,
+        settingsStore: settingsStore,
+      );
+      addTearDown(state.dispose);
+      stubSignedInRefresh(
+        cacheStore: cacheStore,
+        client: client,
+        sessionStore: sessionStore,
+      );
+      when(() => client.fetchRecentlyAddedAlbums())
+          .thenThrow(StateError('unsupported sort'));
+
+      final signedIn = await state.signIn(
+        serverUrl: 'https://example.com',
+        username: 'user',
+        password: 'password',
+      );
+
+      expect(signedIn, isTrue);
+      expect(state.recentlyAddedAlbums, isEmpty);
+    });
+
     test('signOut clears offline audio state for the previous account',
         () async {
       final cacheStore = _MockCacheStore();

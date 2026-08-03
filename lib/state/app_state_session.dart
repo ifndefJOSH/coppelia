@@ -139,6 +139,7 @@ extension AppStateSessionExtension on AppState {
     _playlistTracks = [];
     _smartListTracks = [];
     _featuredTracks = [];
+    _recentlyAddedAlbums = [];
     _playlists = [];
     _albums = [];
     _artists = [];
@@ -177,7 +178,7 @@ extension AppStateSessionExtension on AppState {
     _notify();
   }
 
-  /// Refreshes playlists and featured tracks.
+  /// Refreshes library data and Home content.
   Future<void> refreshLibrary() async {
     if (_session == null) {
       return;
@@ -206,6 +207,13 @@ extension AppStateSessionExtension on AppState {
       final featured = await _client.fetchRecentTracks();
       _featuredTracks = featured;
       await _cacheStore.saveFeaturedTracks(featured);
+      try {
+        final recentlyAddedAlbums = await _client.fetchRecentlyAddedAlbums();
+        _recentlyAddedAlbums = recentlyAddedAlbums;
+        await _cacheStore.saveRecentlyAddedAlbums(recentlyAddedAlbums);
+      } catch (_) {
+        // Keep the cached shelf when the optional Home query fails.
+      }
 
       await _loadAlbums();
       await _loadArtists();
