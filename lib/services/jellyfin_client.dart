@@ -203,6 +203,36 @@ class JellyfinClient {
         .toList();
   }
 
+  /// Fetches the newest albums added to the user's Jellyfin library.
+  Future<List<Album>> fetchRecentlyAddedAlbums() async {
+    final session = _requireSession();
+    final uri = Uri.parse(
+      '${session.serverUrl}/Users/${session.userId}/Items',
+    ).replace(
+      queryParameters: {
+        'IncludeItemTypes': 'MusicAlbum',
+        'Recursive': 'true',
+        'SortBy': 'DateCreated',
+        'SortOrder': 'Descending',
+        'Limit': '12',
+        'Fields': 'ImageTags,ChildCount,AlbumArtist,AlbumArtists',
+      },
+    );
+    final response =
+        await _httpClient.get(uri, headers: _authenticatedHeaders(session));
+    if (response.statusCode != 200) {
+      throw Exception('Unable to load recently added albums.');
+    }
+    final payload = jsonDecode(response.body) as Map<String, dynamic>;
+    final items = payload['Items'] as List<dynamic>? ?? [];
+    return items
+        .map((item) => Album.fromJellyfin(
+              item as Map<String, dynamic>,
+              serverUrl: session.serverUrl,
+            ))
+        .toList();
+  }
+
   /// Fetches artists from Jellyfin.
   Future<List<Artist>> fetchArtists() async {
     final session = _requireSession();

@@ -111,6 +111,7 @@ class AppState extends ChangeNotifier {
   List<Playlist> _playlists = [];
   List<MediaItem> _playlistTracks = [];
   List<MediaItem> _featuredTracks = [];
+  List<Album> _recentlyAddedAlbums = [];
   List<MediaItem> _queue = [];
   List<Album> _albums = [];
   List<Artist> _artists = [];
@@ -427,6 +428,10 @@ class AppState extends ChangeNotifier {
 
   /// Available albums.
   List<Album> get albums => List.unmodifiable(_albums);
+
+  /// Albums most recently added to the Jellyfin library.
+  List<Album> get recentlyAddedAlbums =>
+      List.unmodifiable(_recentlyAddedAlbums);
 
   /// Available artists.
   List<Artist> get artists => List.unmodifiable(_artists);

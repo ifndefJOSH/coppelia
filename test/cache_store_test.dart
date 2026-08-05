@@ -5,6 +5,7 @@ import 'package:path_provider_platform_interface/path_provider_platform_interfac
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 
+import 'package:coppelia/models/album.dart';
 import 'package:coppelia/models/media_item.dart';
 import 'package:coppelia/models/playback_resume_state.dart';
 import 'package:coppelia/models/playlist.dart';
@@ -55,6 +56,27 @@ void main() {
 
     expect(restored, hasLength(1));
     expect(restored.first.title, 'Evergreen');
+  });
+
+  test('cache store saves and restores recently added albums', () async {
+    SharedPreferences.setMockInitialValues({});
+    final cacheStore = CacheStore();
+    const albums = [
+      Album(
+        id: 'album-1',
+        name: 'New Record',
+        artistName: 'Studio Band',
+        trackCount: 10,
+        imageUrl: 'https://demo.jellyfin.org/Items/album-1/Images/Primary',
+      ),
+    ];
+
+    await cacheStore.saveRecentlyAddedAlbums(albums);
+    final restored = await cacheStore.loadRecentlyAddedAlbums();
+
+    expect(restored, hasLength(1));
+    expect(restored.single.id, 'album-1');
+    expect(restored.single.name, 'New Record');
   });
 
   test('media item cache migration strips legacy api key from stream URL', () {

@@ -1012,6 +1012,7 @@ extension AppStateOfflineExtension on AppState {
     _playlists = await _cacheStore.loadPlaylists();
     _featuredTracks = await _cacheStore.loadFeaturedTracks();
     _albums = await _cacheStore.loadAlbums();
+    _recentlyAddedAlbums = await _cacheStore.loadRecentlyAddedAlbums();
     _artists = await _cacheStore.loadArtists();
     _genres = await _cacheStore.loadGenres();
     _favoriteAlbums = await _cacheStore.loadFavoriteAlbums();
@@ -1052,6 +1053,9 @@ extension AppStateOfflineExtension on AppState {
     _featuredTracks = offlineTracks;
     _recentTracks = offlineTracks;
     _albums = offlineAlbums;
+    _recentlyAddedAlbums = _recentlyAddedAlbums
+        .where((album) => offlineAlbumIds.contains(album.id))
+        .toList();
     _artists = offlineArtists;
     _playlists = offlinePlaylists;
     final cachedFavorites = await _cacheStore.loadFavoriteTracks();

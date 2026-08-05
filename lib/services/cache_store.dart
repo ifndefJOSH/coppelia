@@ -28,6 +28,7 @@ class CacheStore {
   static const _tracksKey = 'cached_playlist_tracks';
   static const _featuredKey = 'cached_featured_tracks';
   static const _albumsKey = 'cached_albums';
+  static const _recentlyAddedAlbumsKey = 'cached_recently_added_albums';
   static const _artistsKey = 'cached_artists';
   static const _genresKey = 'cached_genres';
   static const _albumTracksKey = 'cached_album_tracks';
@@ -137,6 +138,26 @@ class CacheStore {
   Future<List<Album>> loadAlbums() async {
     final preferences = await SharedPreferences.getInstance();
     final raw = preferences.getString(_albumsKey);
+    if (raw == null || raw.isEmpty) {
+      return [];
+    }
+    final decoded = jsonDecode(raw) as List<dynamic>;
+    return decoded
+        .map((entry) => Album.fromJson(entry as Map<String, dynamic>))
+        .toList();
+  }
+
+  /// Persists the newest albums shown on the Home screen.
+  Future<void> saveRecentlyAddedAlbums(List<Album> albums) async {
+    final preferences = await SharedPreferences.getInstance();
+    final payload = albums.map((album) => album.toJson()).toList();
+    await preferences.setString(_recentlyAddedAlbumsKey, jsonEncode(payload));
+  }
+
+  /// Loads the cached newest albums shown on the Home screen.
+  Future<List<Album>> loadRecentlyAddedAlbums() async {
+    final preferences = await SharedPreferences.getInstance();
+    final raw = preferences.getString(_recentlyAddedAlbumsKey);
     if (raw == null || raw.isEmpty) {
       return [];
     }
@@ -484,6 +505,7 @@ class CacheStore {
     await preferences.remove(_tracksKey);
     await preferences.remove(_featuredKey);
     await preferences.remove(_albumsKey);
+    await preferences.remove(_recentlyAddedAlbumsKey);
     await preferences.remove(_artistsKey);
     await preferences.remove(_genresKey);
     await preferences.remove(_albumTracksKey);

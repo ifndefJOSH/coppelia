@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -42,6 +44,24 @@ void main() {
     expect(visibility[HomeSection.featured], isTrue);
     expect(visibility[HomeSection.recent], isFalse);
     expect(visibility[HomeSection.playlists], isTrue);
+    expect(visibility[HomeSection.recentlyAddedAlbums], isTrue);
+  });
+
+  test('settings store appends new home sections to saved ordering', () async {
+    SharedPreferences.setMockInitialValues({
+      'settings_home_section_order': jsonEncode([
+        'featured',
+        'recent',
+        'playlists',
+        'jumpIn',
+        'smartLists',
+      ]),
+    });
+    final store = SettingsStore();
+
+    final order = await store.loadHomeSectionOrder();
+
+    expect(order.last, HomeSection.recentlyAddedAlbums);
   });
 
   test('settings store saves sidebar visibility', () async {

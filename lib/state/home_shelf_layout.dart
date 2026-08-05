@@ -1,4 +1,4 @@
-/// Layout styles for featured/recent home shelves.
+/// Layout styles for media shelves on Home.
 enum HomeShelfLayout {
   /// Horizontal scroller layout.
   whooshy,

@@ -10,8 +10,11 @@ import '../../state/layout_density.dart';
 import '../../state/library_view.dart';
 import '../../core/color_tokens.dart';
 import '../../core/formatters.dart';
+import '../../models/album.dart';
 import '../../models/media_item.dart';
+import 'album_context_menu.dart';
 import 'featured_track_card.dart';
+import 'library_card.dart';
 import 'media_card.dart';
 import 'playlist_tile.dart';
 import 'section_header.dart';
@@ -241,6 +244,73 @@ class LibraryOverview extends StatelessWidget {
       );
     }
 
+    Widget buildAlbumShelf({required List<Album> albums}) {
+      Widget buildAlbumCard(Album album) => LibraryCard(
+            title: album.name,
+            subtitle: album.artistName,
+            imageUrl: album.imageUrl,
+            icon: Icons.album,
+            onTap: () => state.selectAlbum(album),
+            onSubtitleTap: canLinkArtist(album)
+                ? () => state.selectArtistByName(album.artistName)
+                : null,
+            onContextMenu: (position) =>
+                showAlbumContextMenu(context, position, album, state),
+          );
+
+      if (state.homeShelfLayout == HomeShelfLayout.grid) {
+        return Padding(
+          padding: sectionPadding(),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final targetWidth = space(170).clamp(130.0, 220.0);
+              const aspectRatio = 0.82;
+              final columns = math.max(
+                2,
+                GridMetrics.fromWidth(
+                  width: constraints.maxWidth,
+                  itemAspectRatio: aspectRatio,
+                  itemMinWidth: targetWidth,
+                  spacing: space(12),
+                ).columns,
+              );
+              final maxItems = math.min(
+                albums.length,
+                columns * state.homeShelfGridRows,
+              );
+              final displayedAlbums = albums.take(maxItems).toList();
+              return AdaptiveGrid(
+                itemCount: displayedAlbums.length,
+                aspectRatio: aspectRatio,
+                spacing: space(12),
+                targetMinWidth: targetWidth,
+                columns: columns,
+                itemBuilder: (context, index) =>
+                    buildAlbumCard(displayedAlbums[index]),
+              );
+            },
+          ),
+        );
+      }
+
+      return Padding(
+        padding: leftPadding(),
+        child: SizedBox(
+          height: space(210).clamp(160.0, 240.0),
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: EdgeInsets.zero,
+            itemCount: albums.length,
+            separatorBuilder: (_, __) => SizedBox(width: space(16)),
+            itemBuilder: (context, index) => SizedBox(
+              width: space(155).clamp(130.0, 190.0),
+              child: buildAlbumCard(albums[index]),
+            ),
+          ),
+        ),
+      );
+    }
+
     final builders = <HomeSection, void Function()>{
       HomeSection.featured: () {
         if (!state.isHomeSectionVisible(HomeSection.featured)) {
@@ -281,6 +351,30 @@ class LibraryOverview extends StatelessWidget {
                 ? null
                 : () => state.selectAlbumById(track.albumId!),
           ),
+        ]);
+      },
+      HomeSection.recentlyAddedAlbums: () {
+        final albums = state.recentlyAddedAlbums;
+        if (!state.isHomeSectionVisible(HomeSection.recentlyAddedAlbums) ||
+            albums.isEmpty) {
+          return;
+        }
+        addSection([
+          Padding(
+            padding: sectionPadding(),
+            child: SectionHeader(
+              title: 'Recently added albums',
+              action: Text(
+                '${albums.length} albums',
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: ColorTokens.textSecondary(context)),
+              ),
+            ),
+          ),
+          SizedBox(height: space(16)),
+          buildAlbumShelf(albums: albums),
         ]);
       },
       HomeSection.recent: () {

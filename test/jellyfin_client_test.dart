@@ -114,6 +114,57 @@ void main() {
     expect(headers, isNot(contains('X-Emby-Token')));
   });
 
+  test('fetchRecentlyAddedAlbums requests newest album records', () async {
+    final client = _MockHttpClient();
+    final jellyfin = JellyfinClient(httpClient: client);
+    jellyfin.updateSession(
+      const AuthSession(
+        accessToken: 'token',
+        serverUrl: 'https://demo.jellyfin.org',
+        userId: 'user-1',
+        userName: 'Jordan',
+      ),
+    );
+    when(
+      () => client.get(
+        any(),
+        headers: any(named: 'headers'),
+      ),
+    ).thenAnswer(
+      (_) async => http.Response(
+        jsonEncode({
+          'Items': [
+            {
+              'Id': 'album-1',
+              'Name': 'New Record',
+              'AlbumArtist': 'Studio Band',
+              'ChildCount': 10,
+              'ImageTags': {'Primary': 'cover'},
+            },
+          ],
+        }),
+        200,
+      ),
+    );
+
+    final albums = await jellyfin.fetchRecentlyAddedAlbums();
+
+    expect(albums, hasLength(1));
+    expect(albums.single.name, 'New Record');
+    expect(albums.single.artistName, 'Studio Band');
+    final uri = verify(
+      () => client.get(
+        captureAny(),
+        headers: any(named: 'headers'),
+      ),
+    ).captured.single as Uri;
+    expect(uri.queryParameters['IncludeItemTypes'], 'MusicAlbum');
+    expect(uri.queryParameters['SortBy'], 'DateCreated');
+    expect(uri.queryParameters['SortOrder'], 'Descending');
+    expect(uri.queryParameters['Limit'], '12');
+    expect(uri.queryParameters['Recursive'], 'true');
+  });
+
   test('addToPlaylist uses the current Jellyfin query API', () async {
     final client = _MockHttpClient();
     final jellyfin = JellyfinClient(httpClient: client);
