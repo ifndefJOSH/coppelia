@@ -62,13 +62,17 @@ class _SearchResultsViewState extends State<SearchResultsView> {
     final rightGutter = (24 * densityScale).clamp(12.0, 32.0).toDouble();
     final results = state.searchResults;
     final isLoading = state.isSearchLoading;
+    final offlineMode = state.offlineMode;
     if (isLoading && results == null) {
       return const Center(child: CircularProgressIndicator());
     }
     if (state.searchQuery.trim().isEmpty && !isLoading) {
       return Center(
         child: Text(
-          'Search your library',
+          // If searching in offline mode, remind the user
+          offlineMode
+              ? 'Search your downloaded library'
+              : 'Search your library',
           style: Theme.of(context)
               .textTheme
               .titleMedium
@@ -380,8 +384,7 @@ class _SearchResultsViewState extends State<SearchResultsView> {
                 final displayedPlaylists = _showAllPlaylists
                     ? results.playlists
                     : results.playlists.take(_maxInitialGridItems).toList();
-                final hasMore =
-                    results.playlists.length > _maxInitialGridItems;
+                final hasMore = results.playlists.length > _maxInitialGridItems;
 
                 return Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
