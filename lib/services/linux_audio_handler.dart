@@ -58,7 +58,9 @@ class LinuxAudioHandler extends BaseAudioHandler with SeekHandler {
         id: item.id,
         title: item.title,
         album: item.album,
-        artist: item.artists.isNotEmpty ? item.artists.join(', ') : 'Unknown Artist',
+        artist: item.artists.isNotEmpty
+            ? item.artists.join(', ')
+            : 'Unknown Artist',
         duration: item.duration,
         artUri: item.imageUrl == null ? null : Uri.parse(item.imageUrl!),
       ));

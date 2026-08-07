@@ -45,9 +45,8 @@ class _LoginScreenState extends State<LoginScreen> {
           child: LayoutBuilder(
             builder: (context, constraints) {
               final available = constraints.maxWidth - space(32);
-              final maxWidth = available < 280
-                  ? constraints.maxWidth * 0.9
-                  : 440.0;
+              final maxWidth =
+                  available < 280 ? constraints.maxWidth * 0.9 : 440.0;
               return ConstrainedBox(
                 constraints: BoxConstraints(maxWidth: maxWidth),
                 child: GlassContainer(

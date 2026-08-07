@@ -45,6 +45,7 @@ class Artist {
       }
       return 0;
     }
+
     final itemCounts = json['ItemCounts'] as Map<String, dynamic>?;
     final albumCount = parseCount(json['AlbumCount']) != 0
         ? parseCount(json['AlbumCount'])

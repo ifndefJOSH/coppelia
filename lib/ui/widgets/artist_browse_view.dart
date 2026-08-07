@@ -41,8 +41,7 @@ class ArtistBrowseView extends StatelessWidget {
           imageUrl: artist.imageUrl,
           icon: Icons.people_alt,
           onTap: () => onSelect(artist),
-          onContextMenu: (position) =>
-              onContextMenu(context, position, artist),
+          onContextMenu: (position) => onContextMenu(context, position, artist),
         );
       },
       listItemBuilder: (context, artist) {
@@ -53,8 +52,7 @@ class ArtistBrowseView extends StatelessWidget {
           imageUrl: artist.imageUrl,
           icon: Icons.people_alt,
           onTap: () => onSelect(artist),
-          onContextMenu: (position) =>
-              onContextMenu(context, position, artist),
+          onContextMenu: (position) => onContextMenu(context, position, artist),
         );
       },
     );

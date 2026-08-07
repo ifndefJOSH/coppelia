@@ -19,11 +19,9 @@ class FavoriteAlbumsView extends StatelessWidget {
       title: 'Favorite Albums',
       albums: state.favoriteAlbums,
       onSelect: state.selectAlbum,
-      onSelectArtist: (album) =>
-          state.selectArtistByName(album.artistName),
+      onSelectArtist: (album) => state.selectArtistByName(album.artistName),
       onContextMenu: (context, position, album) =>
           showAlbumContextMenu(context, position, album, state),
     );
   }
-
 }

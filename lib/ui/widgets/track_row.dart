@@ -104,8 +104,7 @@ class TrackRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isActive = this.isActive;
-    final density =
-        context.select((AppState state) => state.layoutDensity);
+    final density = context.select((AppState state) => state.layoutDensity);
     final densityScale = density.scaleDouble;
     double space(double value) => value * densityScale;
     double clamped(double value, {double min = 0, double max = 999}) =>
@@ -116,15 +115,13 @@ class TrackRow extends StatelessWidget {
     final metaGap = density == LayoutDensity.sardine
         ? space(1).clamp(0.0, 2.0)
         : space(2).clamp(1.0, 4.0);
-    final useSingleTap = !kIsWeb &&
-        (Platform.isIOS || Platform.isAndroid || Platform.isFuchsia);
+    final useSingleTap =
+        !kIsWeb && (Platform.isIOS || Platform.isAndroid || Platform.isFuchsia);
     final baseColor =
         isActive ? ColorTokens.activeRow(context) : Colors.transparent;
-    final rowRadius =
-        context.scaledRadius(clamped(14, min: 6, max: 16));
+    final rowRadius = context.scaledRadius(clamped(14, min: 6, max: 16));
     final artSize = clamped(44, min: 24, max: 56);
-    final artRadius =
-        context.scaledRadius(clamped(10, min: 4, max: 12));
+    final artRadius = context.scaledRadius(clamped(10, min: 4, max: 12));
     final indexWidth = clamped(32, min: 16, max: 36);
     final statusIcon = iconForTrackStatus(statusIconState);
     Widget buildArtworkFallback() => ArtworkFallback(
@@ -258,8 +255,7 @@ class TrackRow extends StatelessWidget {
 
   Future<void> _showMenu(BuildContext context, Offset position) async {
     final state = context.read<AppState>();
-    final canManagePlaylists =
-        state.session != null && !state.offlineMode;
+    final canManagePlaylists = state.session != null && !state.offlineMode;
     final isPinned = await state.isTrackPinned(track);
     if (!context.mounted) {
       return;

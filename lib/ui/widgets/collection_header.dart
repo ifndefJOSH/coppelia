@@ -193,8 +193,8 @@ class CollectionHeader extends StatelessWidget {
                 ),
                 const Spacer(),
                 SearchCircleButton(
-                  onTap: onSearch ??
-                      context.read<AppState>().requestSearchFocus,
+                  onTap:
+                      onSearch ?? context.read<AppState>().requestSearchFocus,
                 ),
               ],
             ),

@@ -38,11 +38,9 @@ class _GlowingLoadingBarState extends State<GlowingLoadingBar>
 
   @override
   Widget build(BuildContext context) {
-    final densityScale =
-        context.watch<AppState>().layoutDensity.scaleDouble;
+    final densityScale = context.watch<AppState>().layoutDensity.scaleDouble;
     final barHeight = (6 * densityScale).clamp(3.0, 8.0);
-    final radius =
-        context.scaledRadius((6 * densityScale).clamp(3.0, 8.0));
+    final radius = context.scaledRadius((6 * densityScale).clamp(3.0, 8.0));
     return SizedBox(
       height: barHeight,
       child: AnimatedOpacity(
