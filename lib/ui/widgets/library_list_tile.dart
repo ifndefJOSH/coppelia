@@ -45,8 +45,7 @@ class LibraryListTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final density =
-        context.select((AppState state) => state.layoutDensity);
+    final density = context.select((AppState state) => state.layoutDensity);
     final densityScale = density.scaleDouble;
     double space(double value) => value * densityScale;
     double clamped(double value, {double min = 0, double max = 999}) =>

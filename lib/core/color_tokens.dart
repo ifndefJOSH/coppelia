@@ -38,10 +38,7 @@ class ColorTokens {
 
   /// Divider/border tone.
   static Color border(BuildContext context, [double opacity = 0.08]) {
-    return Theme.of(context)
-        .colorScheme
-        .onSurface
-        .withValues(alpha: opacity);
+    return Theme.of(context).colorScheme.onSurface.withValues(alpha: opacity);
   }
 
   /// Card fill for tiles.
@@ -67,10 +64,7 @@ class ColorTokens {
 
   /// Secondary text tone.
   static Color textSecondary(BuildContext context, [double opacity = 0.6]) {
-    return Theme.of(context)
-        .colorScheme
-        .onSurface
-        .withValues(alpha: opacity);
+    return Theme.of(context).colorScheme.onSurface.withValues(alpha: opacity);
   }
 
   /// Active row highlight.

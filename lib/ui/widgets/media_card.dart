@@ -98,8 +98,8 @@ class MediaCard extends StatelessWidget {
     final baseRadius = borderRadius ?? clamped(22, min: 12, max: 26);
     final cardRadius = baseRadius * radiusScale;
     final iconSize = clamped(32, min: 18, max: 36);
-    final overlayPadding = artOverlayPadding ??
-        EdgeInsets.all(space(10).clamp(4.0, 12.0));
+    final overlayPadding =
+        artOverlayPadding ?? EdgeInsets.all(space(10).clamp(4.0, 12.0));
     Widget buildArtworkFallback({double? iconOverride}) => ArtworkFallback(
           icon: fallbackIcon,
           iconSize: iconOverride ?? iconSize,
@@ -173,7 +173,8 @@ class MediaCard extends StatelessWidget {
 
     Widget buildContent({required Widget art, required Widget text}) {
       return MouseRegion(
-        cursor: clickEnabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
+        cursor:
+            clickEnabled ? SystemMouseCursors.click : SystemMouseCursors.basic,
         child: GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: onTap,
@@ -281,8 +282,7 @@ class MediaCard extends StatelessWidget {
     final titleStyle = isCompactVertical
         ? theme.textTheme.titleSmall?.copyWith(height: 1.0)
         : theme.textTheme.titleMedium;
-    final subtitleGap =
-        isCompactVertical ? 0.0 : space(3).clamp(1.0, 5.0);
+    final subtitleGap = isCompactVertical ? 0.0 : space(3).clamp(1.0, 5.0);
     final text = Padding(
       padding: textPadding,
       child: Column(

@@ -163,14 +163,19 @@ class SearchService {
       return List<T>.from(items);
     }
 
-    final ranked = items.asMap().entries.map((entry) {
-      final item = entry.value;
-      final score = _scoreItem(
-        query: normalizedQuery,
-        fields: fieldsOf(item),
-      );
-      return (item: item, score: score, index: entry.key);
-    }).where((result) => minScore == null || result.score >= minScore).toList()
+    final ranked = items
+        .asMap()
+        .entries
+        .map((entry) {
+          final item = entry.value;
+          final score = _scoreItem(
+            query: normalizedQuery,
+            fields: fieldsOf(item),
+          );
+          return (item: item, score: score, index: entry.key);
+        })
+        .where((result) => minScore == null || result.score >= minScore)
+        .toList()
       ..sort((a, b) {
         final scoreCompare = b.score.compareTo(a.score);
         if (scoreCompare != 0) {
@@ -334,13 +339,12 @@ class SearchService {
   static List<String> _tokenize(String value) =>
       value.split(' ').where((token) => token.isNotEmpty).toList();
 
-  static String _normalize(String value) =>
-      value
-          .trim()
-          .toLowerCase()
-          .replaceAll('&', ' and ')
-          .replaceAll('+', ' and ')
-          .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
-          .replaceAll(RegExp(r'\s+'), ' ')
-          .trim();
+  static String _normalize(String value) => value
+      .trim()
+      .toLowerCase()
+      .replaceAll('&', ' and ')
+      .replaceAll('+', ' and ')
+      .replaceAll(RegExp(r'[^a-z0-9]+'), ' ')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
 }

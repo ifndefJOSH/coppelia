@@ -226,8 +226,8 @@ class _SmartListGroupEditor extends StatelessWidget {
             children: [
               Text('Match', style: Theme.of(context).textTheme.bodySmall),
               SizedBox(width: space(8)),
-                  DropdownButton<SmartListGroupMode>(
-                    value: group.mode,
+              DropdownButton<SmartListGroupMode>(
+                value: group.mode,
                 onChanged: (value) {
                   if (value == null) {
                     return;
@@ -392,9 +392,9 @@ class _SmartListRuleEditorState extends State<_SmartListRuleEditor> {
         final isNarrow = constraints.maxWidth < 520;
         final fieldDropdown = ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 140),
-            child: DropdownButtonFormField<SmartListField>(
-              key: ValueKey(rule.field),
-              initialValue: rule.field,
+          child: DropdownButtonFormField<SmartListField>(
+            key: ValueKey(rule.field),
+            initialValue: rule.field,
             isExpanded: true,
             style: dropdownStyle,
             decoration: const InputDecoration(isDense: true),
@@ -422,9 +422,9 @@ class _SmartListRuleEditorState extends State<_SmartListRuleEditor> {
         );
         final operatorDropdown = ConstrainedBox(
           constraints: const BoxConstraints(minWidth: 140),
-            child: DropdownButtonFormField<SmartListOperator>(
-              key: ValueKey(rule.operatorType),
-              initialValue: rule.operatorType,
+          child: DropdownButtonFormField<SmartListOperator>(
+            key: ValueKey(rule.operatorType),
+            initialValue: rule.operatorType,
             isExpanded: true,
             style: dropdownStyle,
             decoration: const InputDecoration(isDense: true),

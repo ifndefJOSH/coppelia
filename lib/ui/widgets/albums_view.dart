@@ -19,8 +19,7 @@ class AlbumsView extends StatelessWidget {
       title: 'Albums',
       albums: state.albums,
       onSelect: state.selectAlbum,
-      onSelectArtist: (album) =>
-          state.selectArtistByName(album.artistName),
+      onSelectArtist: (album) => state.selectArtistByName(album.artistName),
       onContextMenu: (context, position, album) =>
           showAlbumContextMenu(context, position, album, state),
     );

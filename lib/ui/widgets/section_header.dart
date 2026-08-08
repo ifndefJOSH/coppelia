@@ -17,8 +17,7 @@ class SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final densityScale =
-        context.watch<AppState>().layoutDensity.scaleDouble;
+    final densityScale = context.watch<AppState>().layoutDensity.scaleDouble;
     double space(double value) => value * densityScale;
     return LayoutBuilder(
       builder: (context, constraints) {

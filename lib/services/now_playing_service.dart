@@ -6,8 +6,7 @@ import '../models/media_item.dart';
 
 /// Bridges playback metadata to macOS Now Playing.
 class NowPlayingService {
-  static const MethodChannel _channel =
-      MethodChannel('coppelia/now_playing');
+  static const MethodChannel _channel = MethodChannel('coppelia/now_playing');
 
   /// Binds remote media commands to callbacks.
   void bind({
@@ -59,9 +58,8 @@ class NowPlayingService {
     if (!Platform.isMacOS && !Platform.isIOS) {
       return;
     }
-    final artist = track.artists.isNotEmpty
-        ? track.artists.join(', ')
-        : 'Unknown Artist';
+    final artist =
+        track.artists.isNotEmpty ? track.artists.join(', ') : 'Unknown Artist';
     await _channel.invokeMethod('update', {
       'id': track.id,
       'title': track.title,
