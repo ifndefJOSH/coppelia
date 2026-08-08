@@ -43,6 +43,11 @@ class JellyfinClient {
   final Duration _playlistRequestTimeout;
 
   AuthSession? _session;
+  // Available sessions across servers. Maps a record of the
+  // username and the server URL to an authenticated session.
+  // Useful for multiple servers or for multiple accounts on
+  // the same server
+  Map<(String, String), AuthSession> _sessions;
   String _deviceId = defaultDeviceId;
   String _deviceName = defaultDeviceName;
 
@@ -65,8 +70,27 @@ class JellyfinClient {
 
   /// Clears the current session.
   void clearSession() {
+    // Remove the current session from the session map
+    final serverUrl = _session?.serverUrl;
+    final username = _session?.userName;
+    final sessionId = (username, serverUrl);
+    _sessions.remove(sessionId);
     _session = null;
   }
+
+  // Switches to a new session based on the username and server
+  void switchSession(String userName, String serverUrl) {
+    final sessionId = (userName, serverUrl);
+    if (_sessions.containsKey(sessionId)) {
+      _session = _sessions[sessionId];
+    } else {
+      throw Exception(
+          'No authenticated session for user $userName on server $serverUrl!');
+    }
+  }
+
+  // Gets available sessions by ID
+  Iterable<(String, String)> get availableSessions => _sessions.keys();
 
   /// Updates the device information used in requests.
   void updateDeviceInfo({
@@ -106,6 +130,13 @@ class JellyfinClient {
     required String username,
     required String password,
   }) async {
+    final sessionId = (username, serverUrl);
+
+    // If already authenticated, just return existing session
+    if (_sessions.containsKey(sessionId)) {
+      return _sessions[sessionId];
+    }
+
     final logService = await LogService.instance;
     final sanitizedUrl = _sanitizeServerUrl(serverUrl);
 
@@ -139,7 +170,9 @@ class JellyfinClient {
       userId: user['Id'] as String,
       userName: user['Name'] as String? ?? username,
     );
+
     _session = session;
+    _sessions[sessionId] = session;
 
     await logService.info(
         'Authentication successful for user ${session.userName} (${session.userId})');

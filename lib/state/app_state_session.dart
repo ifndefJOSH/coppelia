@@ -175,7 +175,13 @@ extension AppStateSessionExtension on AppState {
     _lastPlaybackPersistAt = null;
     unawaited(_nowPlayingService.clear());
     await _sessionStore.saveSession(null);
+    // TODO: Should pick next session if available?
     _notify();
+  }
+
+  // Switches the current session
+  Future<void> switchSession(String userName, String serverUrl) {
+    _client.switchSession(userName, serverUrl);
   }
 
   /// Refreshes library data and Home content.
